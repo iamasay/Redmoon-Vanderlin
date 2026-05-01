@@ -8,6 +8,7 @@
 	additional_details = list(
 		INTERACTION_MAY_CAUSE_PREGNANCY
 	)
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/fuck/display_interaction(mob/living/user, mob/living/partner)
 	var/message
@@ -63,6 +64,7 @@
 	required_from_user_exposed = INTERACTION_REQUIRE_PENIS
 	required_from_target_exposed = INTERACTION_REQUIRE_ANUS
 	additional_details = null // no pregnancy
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/fuck/anal/display_interaction(mob/living/user, mob/living/partner)
 	var/message
@@ -163,6 +165,7 @@
 	required_from_target_exposed = INTERACTION_REQUIRE_FEET
 	required_from_target_unexposed = INTERACTION_REQUIRE_FEET
 	require_target_num_feet = 1
+	body_parts = list(BODY_PART_LLEG, BODY_PART_RLEG)
 
 /datum/interaction/lewd/footfuck/display_interaction(mob/living/user, mob/living/partner)
 	var/message
@@ -193,6 +196,7 @@
 /datum/interaction/lewd/footfuck/double
 	description = "Член. Потереться о ботинки."
 	require_target_num_feet = 2
+	body_parts = list(BODY_PART_LLEG, BODY_PART_RLEG)
 
 /datum/interaction/lewd/footfuck/double/display_interaction(mob/living/user, mob/living/partner)
 	var/message
@@ -230,6 +234,7 @@
 	required_from_target_exposed = INTERACTION_REQUIRE_FEET
 	required_from_target_unexposed = INTERACTION_REQUIRE_FEET
 	require_target_num_feet = 1
+	body_parts = list(BODY_PART_LLEG, BODY_PART_RLEG)
 
 /datum/interaction/lewd/footfuck/vag/display_interaction(mob/living/user, mob/living/partner)
 	var/message
@@ -264,6 +269,7 @@
 	write_log_target = "was double penetrated by"
 	additional_details = list(INTERACTION_MAY_CAUSE_PREGNANCY)
 	interaction_sound = null
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/double_penetration/display_interaction(mob/living/user, mob/living/partner)
 	var/message
@@ -313,6 +319,7 @@
 	write_log_target = "was double vaginally fucked by"
 	additional_details = list(INTERACTION_MAY_CAUSE_PREGNANCY)
 	interaction_sound = null
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/double_vaginal/display_interaction(mob/living/user, mob/living/partner)
 	var/message
@@ -355,6 +362,7 @@
 	write_log_user = "double anal fucked"
 	write_log_target = "was double anally fucked by"
 	interaction_sound = null
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/double_anal/display_interaction(mob/living/user, mob/living/partner)
 	var/message
@@ -398,6 +406,7 @@
 	write_log_target = "was knot fucked by"
 	interaction_sound = null
 	additional_details = list(INTERACTION_MAY_CAUSE_PREGNANCY)
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/knot_fuck/display_interaction(mob/living/user, mob/living/partner)
 	var/message
@@ -434,6 +443,7 @@
 	write_log_user = "knot anal fucked"
 	write_log_target = "was knot anal fucked by"
 	interaction_sound = null
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/knot_anal_fuck/display_interaction(mob/living/user, mob/living/partner)
 	var/message

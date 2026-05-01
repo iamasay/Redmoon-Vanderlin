@@ -7,6 +7,7 @@
 	max_distance = 0
 	write_log_user = "fingered self"
 	write_log_target = null
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/fingerass_self/display_interaction(mob/living/user)
 
@@ -26,6 +27,7 @@
 	max_distance = 0
 	write_log_user = "fingered own pussy"
 	write_log_target = null
+	body_parts = list(BODY_PART_GROIN)
 
 	additional_details = list(
 		INTERACTION_FILLS_CONTAINERS

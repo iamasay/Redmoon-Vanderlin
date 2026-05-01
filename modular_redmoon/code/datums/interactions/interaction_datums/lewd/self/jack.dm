@@ -7,6 +7,7 @@
 	max_distance = 0
 	write_log_user = "jerked off"
 	write_log_target = null
+	body_parts = list(BODY_PART_GROIN)
 
 	additional_details = list(
 		INTERACTION_FILLS_CONTAINERS

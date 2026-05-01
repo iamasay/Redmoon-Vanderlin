@@ -5,6 +5,7 @@
 	write_log_user = "frotted"
 	write_log_target = "was frotted by"
 	interaction_sound = null
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/frotting/display_interaction(mob/living/user, mob/living/partner)
 	var/message
@@ -24,6 +25,7 @@
 	interaction_sound = null
 	required_from_user_exposed = INTERACTION_REQUIRE_VAGINA
 	required_from_target_exposed = INTERACTION_REQUIRE_VAGINA
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/tribadism/display_interaction(mob/living/user, mob/living/partner)
 	var/message

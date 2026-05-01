@@ -12,6 +12,7 @@
 			"color" = "red"
 		)
 	)
+	body_parts = list(BODY_PART_HEAD)
 
 /datum/interaction/lewd/kiss/display_interaction(mob/living/user, mob/living/partner)
 	if(user.a_intent == INTENT_HELP)

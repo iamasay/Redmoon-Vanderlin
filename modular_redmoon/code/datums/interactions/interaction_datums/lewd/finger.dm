@@ -7,6 +7,7 @@
 	additional_details = list(
 		INTERACTION_FILLS_CONTAINERS
 	)
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/finger/display_interaction(mob/living/user, mob/living/partner)
 	var/obj/item/reagent_containers/liquid_container
@@ -40,6 +41,7 @@
 	interaction_sound = null
 	required_from_user = INTERACTION_REQUIRE_HANDS
 	required_from_target_exposed = INTERACTION_REQUIRE_ANUS
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/fingerass/display_interaction(mob/living/user, mob/living/partner)
 	user.visible_message("<span class='lewd'><b>\The [user]</b> [pick("погружает палец в сфинктер <b>[partner]</b>.",

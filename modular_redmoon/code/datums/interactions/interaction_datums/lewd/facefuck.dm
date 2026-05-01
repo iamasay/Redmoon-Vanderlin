@@ -4,12 +4,14 @@
 	required_from_user_exposed = INTERACTION_REQUIRE_PENIS
 	required_from_target = INTERACTION_REQUIRE_MOUTH
 	var/fucktarget = "penis"
+	body_parts = list(BODY_PART_HEAD)
 
 /datum/interaction/lewd/facefuck/vag
 	description = "Вагина. Потереться об рот."
 	required_from_user_exposed = INTERACTION_REQUIRE_VAGINA
 	required_from_target = INTERACTION_REQUIRE_MOUTH
 	fucktarget = "vagina"
+	body_parts = list(BODY_PART_HEAD)
 
 /datum/interaction/lewd/facefuck/display_interaction(mob/living/user, mob/living/partner)
 	var/message
@@ -115,6 +117,7 @@
 	interaction_sound = null
 	required_from_user_exposed = INTERACTION_REQUIRE_PENIS
 	required_from_target = INTERACTION_REQUIRE_MOUTH
+	body_parts = list(BODY_PART_HEAD)
 
 	additional_details = list(
 		list(
@@ -182,6 +185,7 @@
 	write_log_user = "double oral fucked"
 	write_log_target = "was double oral fucked by"
 	interaction_sound = 'modular_redmoon/sound/interactions/oral1.ogg'
+	body_parts = list(BODY_PART_HEAD)
 
 /datum/interaction/lewd/double_oral/display_interaction(mob/living/user, mob/living/partner)
 	var/message
@@ -227,6 +231,7 @@
 	write_log_user = "knot oral fucked"
 	write_log_target = "was knot oral fucked by"
 	interaction_sound = 'modular_redmoon/sound/interactions/champ2.ogg'
+	body_parts = list(BODY_PART_HEAD)
 
 /datum/interaction/lewd/knot_oral/display_interaction(mob/living/user, mob/living/partner)
 	var/message

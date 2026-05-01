@@ -7,6 +7,7 @@
 	additional_details = list(
 		INTERACTION_FILLS_CONTAINERS
 	)
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/handjob/display_interaction(mob/living/user, mob/living/partner)
 	var/message

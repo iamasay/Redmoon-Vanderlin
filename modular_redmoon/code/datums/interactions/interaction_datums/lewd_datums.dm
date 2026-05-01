@@ -85,6 +85,7 @@
 	max_distance = 0
 	write_log_user = "Отсосал(а) сам(а) себе"
 	write_log_target = null
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/oral/selfsuck/display_interaction(mob/living/carbon/human/user)
 	new /obj/effect/temp_visual/heart(user.loc)
@@ -102,6 +103,7 @@
 	max_distance = 0
 	write_log_user = "отлизал(а) свою собственную киску"
 	write_log_target = null
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/oral/suckvagself/display_interaction(mob/living/carbon/human/user)
 	new /obj/effect/temp_visual/heart(user.loc)
@@ -340,6 +342,7 @@
 	max_distance = 1
 	write_log_target = "Её/его яйца были вылизаны"
 	write_log_user = "Отлизал(а) яйца"
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/lick_nuts/display_interaction(mob/living/user, mob/living/target)
 	new /obj/effect/temp_visual/heart(user.loc)
@@ -356,6 +359,7 @@
 	max_distance = 1
 	write_log_target = "Был трахнут(-а) в уретру"
 	write_log_user = "Трахнул(-а) уретру"
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/fuck_cock/display_interaction(mob/living/user, mob/living/target)
 	new /obj/effect/temp_visual/heart(user.loc)
@@ -391,6 +395,7 @@
 	write_log_target = "got their thighs fucked by"
 	interaction_sound = null
 	max_distance = 1
+	body_parts = list(BODY_PART_LLEG, BODY_PART_RLEG)
 
 /datum/interaction/lewd/fuck_thighs/display_interaction(mob/living/user, mob/living/target)
 	new /obj/effect/temp_visual/heart(user.loc)
@@ -411,6 +416,7 @@
 	write_log_target = "Got a thighjob from"
 	interaction_sound = null
 	max_distance = 1
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/do_thighjob/display_interaction(mob/living/user, mob/living/target)
 	new /obj/effect/temp_visual/heart(user.loc)
@@ -438,6 +444,7 @@
 	interaction_sound = null
 	write_log_target = "на его промежность напердел"
 	write_log_user = "перданул на лицо"
+	body_parts = list(BODY_PART_HEAD)
 
 /datum/interaction/lewd/unholy/do_facefart/display_interaction(mob/living/user, mob/living/target)
 	new /obj/effect/temp_visual/heart(user.loc)
@@ -454,6 +461,7 @@
 	interaction_sound = null
 	write_log_target = "на его промежность напердел"
 	write_log_user = "перданул на промежность"
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/unholy/do_crotchfart/display_interaction(mob/living/user, mob/living/target)
 	new /obj/effect/temp_visual/heart(user.loc)
@@ -470,6 +478,7 @@
 	interaction_sound = null
 	write_log_target = "был(а) трахнут(а) в задницу с пердежом"
 	write_log_user = "трахнул(а) в задницу с пердежом"
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/unholy/do_fartfuck/display_interaction(mob/living/user, mob/living/target)
 	new /obj/effect/temp_visual/heart(user.loc)
@@ -486,6 +495,7 @@
 	interaction_sound = null
 	write_log_target = "его газы высосал из задницы"
 	write_log_user = "высосал газы из задницы"
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/unholy/suck_fart/display_interaction(mob/living/user, mob/living/target)
 	new /obj/effect/temp_visual/heart(user.loc)
@@ -502,6 +512,7 @@
 	interaction_sound = null
 	write_log_target = "его лицо было обосрано"
 	write_log_user = "насрал на лицо"
+	body_parts = list(BODY_PART_HEAD)
 
 /datum/interaction/lewd/unholy/do_faceshit/display_interaction(mob/living/user, mob/living/target)
 	new /obj/effect/temp_visual/heart(user.loc)
@@ -518,6 +529,7 @@
 	interaction_sound = null
 	write_log_target = "его промежность была обосрана"
 	write_log_user = "насрал на промежность"
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/unholy/do_crotchshit/display_interaction(mob/living/user, mob/living/target)
 	new /obj/effect/temp_visual/heart(user.loc)
@@ -534,6 +546,7 @@
 	interaction_sound = null
 	write_log_target = "трахнут в задницу с говнецом"
 	write_log_user = "трахнул в задницу с говнецом"
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/unholy/do_shitfuck/display_interaction(mob/living/user, mob/living/target)
 	new /obj/effect/temp_visual/heart(user.loc)
@@ -550,6 +563,7 @@
 	interaction_sound = null
 	write_log_target = "его говно высосал из задницы"
 	write_log_user = "высосал говно из задницы"
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/unholy/suck_shit/display_interaction(mob/living/user, mob/living/target)
 	new /obj/effect/temp_visual/heart(user.loc)
@@ -584,6 +598,7 @@
 	required_from_user_unexposed = NONE
 	write_log_user = "pissed in someone's mouth"
 	write_log_target = "got their mouth filled with piss by"
+	body_parts = list(BODY_PART_HEAD)
 
 /datum/interaction/lewd/unholy/piss_mouth/display_interaction(mob/living/carbon/user, mob/living/target)
 	if(!istype(user))

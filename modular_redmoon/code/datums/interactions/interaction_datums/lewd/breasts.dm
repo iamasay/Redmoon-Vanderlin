@@ -12,6 +12,7 @@
 			"color" = "white"
 		)
 	)
+	body_parts = list(BODY_PART_HEAD)
 
 /datum/interaction/lewd/do_breastfeed/display_interaction(mob/living/user, mob/living/target)
 	var/message

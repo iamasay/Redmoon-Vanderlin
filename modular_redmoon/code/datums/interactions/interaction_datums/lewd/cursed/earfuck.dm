@@ -6,6 +6,7 @@
 	interaction_flags = INTERACTION_FLAG_ADJACENT | INTERACTION_FLAG_OOC_CONSENT | INTERACTION_FLAG_EXTREME_CONTENT
 	write_log_user = "earfucked"
 	write_log_target = "had their ear fucked by"
+	body_parts = list(BODY_PART_HEAD)
 	additional_details = list(
 		list(
 			"info" = "При включенном предпочтении вызывает легкое кровотечение, повреждение ушей и мозга",

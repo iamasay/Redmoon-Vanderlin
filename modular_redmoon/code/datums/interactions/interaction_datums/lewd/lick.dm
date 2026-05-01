@@ -3,6 +3,7 @@
 	interaction_sound = null
 	required_from_user = INTERACTION_REQUIRE_MOUTH
 	required_from_target_exposed = INTERACTION_REQUIRE_ANUS
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/rimjob/display_interaction(mob/living/user, mob/living/partner)
 	user.visible_message("<span class='lewd'><b>[user]</b> вылизывает попку <b>[partner]</b>.</span>", ignored_mobs = user.get_unconsenting())
@@ -18,6 +19,7 @@
 	required_from_target_exposed = INTERACTION_REQUIRE_FEET
 	required_from_target_unexposed = INTERACTION_REQUIRE_FEET
 	require_target_num_feet = 1
+	body_parts = list(BODY_PART_LLEG, BODY_PART_RLEG)
 
 /datum/interaction/lewd/lickfeet/display_interaction(mob/living/user, mob/living/partner)
 	var/message

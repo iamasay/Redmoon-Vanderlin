@@ -8,6 +8,7 @@
 	additional_details = list(
 		INTERACTION_MAY_CONTAIN_DRINK
 	)
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/nipsuck/display_interaction(mob/living/carbon/human/user, mob/living/carbon/human/target)
 	var/user_message

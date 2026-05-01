@@ -5,6 +5,7 @@
 	required_from_user_unexposed = INTERACTION_REQUIRE_FEET
 	require_user_num_feet = 1
 	required_from_target = INTERACTION_REQUIRE_MOUTH
+	body_parts = list(BODY_PART_HEAD)
 
 /datum/interaction/lewd/grindface/display_interaction(mob/living/user, mob/living/partner)
 	var/message
@@ -59,6 +60,7 @@
 	required_from_user_unexposed = INTERACTION_REQUIRE_FEET
 	require_user_num_feet = 1
 	required_from_target = INTERACTION_REQUIRE_MOUTH
+	body_parts = list(BODY_PART_HEAD)
 
 /datum/interaction/lewd/grindmouth/display_interaction(mob/living/user, mob/living/partner)
 	var/message
@@ -116,6 +118,7 @@
 	required_from_user_unexposed = INTERACTION_REQUIRE_FEET
 	require_user_num_feet = 1
 	required_from_target_exposed = INTERACTION_REQUIRE_PENIS
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/footjob/display_interaction(mob/living/user, mob/living/partner)
 	var/message
@@ -143,6 +146,7 @@
 /datum/interaction/lewd/footjob/double
 	description = "Ножки. Подрочить двумя ногами."
 	require_user_num_feet = 2
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/footjob/double/display_interaction(mob/living/user, mob/living/partner)
 	var/message
@@ -171,6 +175,7 @@
 /datum/interaction/lewd/footjob/vagina
 	description = "Ножка. Потереть киску."
 	required_from_target_exposed = INTERACTION_REQUIRE_VAGINA
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/footjob/vagina/display_interaction(mob/living/user, mob/living/partner)
 	var/message

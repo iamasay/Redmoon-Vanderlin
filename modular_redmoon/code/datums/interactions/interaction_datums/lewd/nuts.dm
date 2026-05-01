@@ -5,6 +5,7 @@
 	required_from_target = INTERACTION_REQUIRE_MOUTH
 	write_log_user = "make-them-suck-their-nuts"
 	write_log_target = "was made to suck nuts by"
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/nuts/display_interaction(mob/living/user, mob/living/partner)
 	var/message
@@ -41,3 +42,4 @@
 	required_from_target_exposed = INTERACTION_REQUIRE_BALLS
 	write_log_user = "slapped-nuts"
 	write_log_target = "had their nuts slapped by"
+	body_parts = list(BODY_PART_GROIN)

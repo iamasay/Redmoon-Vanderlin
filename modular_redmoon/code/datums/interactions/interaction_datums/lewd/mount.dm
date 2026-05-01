@@ -6,6 +6,7 @@
 	additional_details = list(
 		INTERACTION_MAY_CAUSE_PREGNANCY
 	)
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/mount/display_interaction(mob/living/user, mob/living/partner)
 	var/message
@@ -31,6 +32,7 @@
 	interaction_sound = null
 	required_from_user_exposed = INTERACTION_REQUIRE_ANUS
 	required_from_target_exposed = INTERACTION_REQUIRE_PENIS
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/mountass/display_interaction(mob/living/user, mob/living/partner)
 	var/message
@@ -57,6 +59,7 @@
 	interaction_sound = null
 	required_from_user_exposed = INTERACTION_REQUIRE_ANUS
 	required_from_target = INTERACTION_REQUIRE_MOUTH
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/mountface/display_interaction(mob/living/user, mob/living/partner)
 	var/message
@@ -84,6 +87,7 @@
 	write_log_user = "thigh-trapped (penis)"
 	write_log_target = "was smothered (penis) by"
 	var/fucktarget = "penis"
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/thighs/vagina
 	description = "Вагина. Придушить."
@@ -91,6 +95,7 @@
 	write_log_user = "thigh-trapped (vagina)"
 	write_log_target = "was smothered (vagina) by"
 	fucktarget = "vagina"
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/thighs/display_interaction(mob/living/user, mob/living/partner)
 	var/message

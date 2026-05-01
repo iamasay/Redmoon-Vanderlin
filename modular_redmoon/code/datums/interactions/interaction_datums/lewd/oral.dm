@@ -9,11 +9,13 @@
 		INTERACTION_MAY_CONTAIN_DRINK
 	)
 	var/fucktarget = "vagina"
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/oral/blowjob
 	description = "Член. Отсосать."
 	required_from_target_exposed = INTERACTION_REQUIRE_PENIS
 	fucktarget = "penis"
+	body_parts = list(BODY_PART_GROIN)
 
 /datum/interaction/lewd/oral/display_interaction(mob/living/user, mob/living/partner)
 	var/message
