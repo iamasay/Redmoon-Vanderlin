@@ -71,9 +71,21 @@ SUBSYSTEM_DEF(ambience)
 	return sound_length + rand(min_ambience_cooldown, max_ambience_cooldown)
 
 /datum/controller/subsystem/ambience/proc/remove_ambience_client(client/to_remove)
-	ambience_listening_clients -= to_remove
-	client_old_areas -= to_remove
-	currentrun -= to_remove
+	if(islist(ambience_listening_clients))
+		try
+			ambience_listening_clients -= to_remove
+		catch
+			ambience_listening_clients = list()
+	if(islist(client_old_areas))
+		try
+			client_old_areas -= to_remove
+		catch
+			client_old_areas = list()
+	if(islist(currentrun))
+		try
+			currentrun -= to_remove
+		catch
+			currentrun = list()
 
 /**
  * Ambience buzz handling called by either area/Enter() or refresh_looping_ambience()

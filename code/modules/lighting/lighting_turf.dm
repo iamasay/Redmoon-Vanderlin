@@ -115,9 +115,16 @@
 		reconsider_lights() //The lighting system only cares whether the tile is fully concealed from all directions or not.
 
 /turf/proc/change_area(area/old_area, area/new_area)
-	GLOB.SUNLIGHT_QUEUE_WORK += src
-	if(outdoor_effect)
-		GLOB.SUNLIGHT_QUEUE_UPDATE += outdoor_effect
+	try
+		GLOB.SUNLIGHT_QUEUE_WORK += src
+	catch
+		GLOB.SUNLIGHT_QUEUE_WORK = list(src)
+	if(istype(outdoor_effect))
+		try
+			if(!(outdoor_effect in GLOB.SUNLIGHT_QUEUE_UPDATE))
+				GLOB.SUNLIGHT_QUEUE_UPDATE += outdoor_effect
+		catch
+			GLOB.SUNLIGHT_QUEUE_UPDATE = list(outdoor_effect)
 	if(SSlighting.initialized)
 		if (new_area.dynamic_lighting != old_area.dynamic_lighting)
 			if (new_area.dynamic_lighting)

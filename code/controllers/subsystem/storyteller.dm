@@ -1322,76 +1322,219 @@ SUBSYSTEM_DEF(gamemode)
 
 /// Chooses a number of chronicle stats from the chronicle sets which will be shown at the round end panel
 /datum/controller/subsystem/gamemode/proc/pick_chronicle_stats()
-	chosen_chronicle_stats.Cut()
+	if(!islist(chosen_chronicle_stats))
+		chosen_chronicle_stats = list()
+	else
+		try
+			chosen_chronicle_stats.Cut()
+		catch
+			chosen_chronicle_stats = list()
 
 	var/list/current_valid_humans = list()
 	var/mob/living/carbon/human/valid_psydon_favourite
 
-	for(var/client/client in GLOB.clients)
-		var/mob/living/carbon/human/human_mob = client.mob
-		if(!ishuman(human_mob) || !human_mob.mind || human_mob.stat == DEAD)
+	var/client_count = 0
+	try
+		client_count = length(GLOB.clients)
+	catch
+		GLOB.clients = list()
+	for(var/client_index in 1 to client_count)
+		var/client/client
+		try
+			client = GLOB.clients[client_index]
+		catch
 			continue
-		current_valid_humans += human_mob
-		if(client.has_triumph_buy(TRIUMPH_BUY_PSYDON_FAVOURITE))
+		if(!client)
+			continue
+		var/mob/living/carbon/human/human_mob
+		try
+			human_mob = client.mob
+		catch
+			continue
+		var/valid_human = FALSE
+		try
+			valid_human = ishuman(human_mob) && human_mob.mind && human_mob.stat != DEAD
+		catch
+			valid_human = FALSE
+		if(!valid_human)
+			continue
+		try
+			current_valid_humans += human_mob
+		catch
+			current_valid_humans = list(human_mob)
+		var/has_psydon_favourite = FALSE
+		try
+			has_psydon_favourite = client.has_triumph_buy(TRIUMPH_BUY_PSYDON_FAVOURITE)
+		catch
+			has_psydon_favourite = FALSE
+		if(has_psydon_favourite)
 			valid_psydon_favourite = human_mob
 
-	if(valid_psydon_favourite && length(current_valid_humans) >= 2)
+	var/current_valid_human_count = 0
+	try
+		current_valid_human_count = length(current_valid_humans)
+	catch
+		current_valid_humans = list()
+	if(valid_psydon_favourite && current_valid_human_count >= 2)
 		chosen_chronicle_stats += CHRONICLE_STATS_PSYDON_FAVOURITE
 		chosen_chronicle_stats += CHRONICLE_STATS_RANDOM_PASSERBY
 	else if(valid_psydon_favourite)
 		chosen_chronicle_stats += CHRONICLE_STATS_PSYDON_FAVOURITE
-		for(var/set_name in chronicle_sets)
-			var/list/set_data = chronicle_sets[set_name]
-			if(length(set_data) >= 2 && GLOB.chronicle_stats[set_data[1]] && GLOB.chronicle_stats[set_data[2]])
-				chosen_chronicle_stats += set_data[1]
-				break
+		if(islist(chronicle_sets))
+			var/chronicle_set_count = 0
+			try
+				chronicle_set_count = length(chronicle_sets)
+			catch
+				chronicle_set_count = 0
+			for(var/set_index in 1 to chronicle_set_count)
+				var/set_name
+				var/list/set_data
+				try
+					set_name = chronicle_sets[set_index]
+					set_data = chronicle_sets[set_name]
+					if(length(set_data) >= 2 && GLOB.chronicle_stats[set_data[1]] && GLOB.chronicle_stats[set_data[2]])
+						chosen_chronicle_stats += set_data[1]
+						break
+				catch
+					continue
 
 	var/list/available_complete_sets = list()
-	for(var/set_name in chronicle_sets)
-		var/list/set_data = chronicle_sets[set_name]
-		if(length(set_data) >= 2 && GLOB.chronicle_stats[set_data[1]] && GLOB.chronicle_stats[set_data[2]])
-			if(!(set_data[1] in chosen_chronicle_stats) && !(set_data[2] in chosen_chronicle_stats))
-				available_complete_sets[set_name] = set_data
+	if(islist(chronicle_sets))
+		var/chronicle_set_count = 0
+		try
+			chronicle_set_count = length(chronicle_sets)
+		catch
+			chronicle_set_count = 0
+		for(var/set_index in 1 to chronicle_set_count)
+			var/set_name
+			var/list/set_data
+			try
+				set_name = chronicle_sets[set_index]
+				set_data = chronicle_sets[set_name]
+				if(length(set_data) >= 2 && GLOB.chronicle_stats[set_data[1]] && GLOB.chronicle_stats[set_data[2]])
+					if(!(set_data[1] in chosen_chronicle_stats) && !(set_data[2] in chosen_chronicle_stats))
+						available_complete_sets[set_name] = set_data
+			catch
+				continue
 
-	var/slots_needed = MAX_CHRONICLE_STATS - length(chosen_chronicle_stats)
+	var/chosen_chronicle_count = 0
+	try
+		chosen_chronicle_count = length(chosen_chronicle_stats)
+	catch
+		chosen_chronicle_stats = list()
+	var/slots_needed = MAX_CHRONICLE_STATS - chosen_chronicle_count
 	var/sets_to_pick = FLOOR(slots_needed / 2, 1)
 
 	for(var/i in 1 to sets_to_pick)
-		if(!length(available_complete_sets))
+		var/available_set_count = 0
+		try
+			available_set_count = length(available_complete_sets)
+		catch
+			available_complete_sets = list()
+		if(!available_set_count)
 			break
 
-		var/picked_set_name = pick(available_complete_sets)
-		var/list/picked_set = available_complete_sets[picked_set_name]
+		try
+			var/picked_set_name = pick(available_complete_sets)
+			var/list/picked_set = available_complete_sets[picked_set_name]
+			chosen_chronicle_stats += picked_set[1]
+			chosen_chronicle_stats += picked_set[2]
+			available_complete_sets -= picked_set_name
+		catch
+			break
 
-		chosen_chronicle_stats += picked_set[1]
-		chosen_chronicle_stats += picked_set[2]
-
-		available_complete_sets -= picked_set_name
-
-	if(length(chosen_chronicle_stats) < MAX_CHRONICLE_STATS)
+	try
+		chosen_chronicle_count = length(chosen_chronicle_stats)
+	catch
+		chosen_chronicle_count = 0
+	if(chosen_chronicle_count < MAX_CHRONICLE_STATS)
 		var/list/all_stats = list()
-		for(var/set_name in chronicle_sets)
-			var/list/set_data = chronicle_sets[set_name]
-			for(var/stat in set_data)
-				if(!(stat in chosen_chronicle_stats) && GLOB.chronicle_stats[stat])
-					all_stats += stat
+		if(islist(chronicle_sets))
+			var/chronicle_set_count = 0
+			try
+				chronicle_set_count = length(chronicle_sets)
+			catch
+				chronicle_set_count = 0
+			for(var/set_index in 1 to chronicle_set_count)
+				var/set_name
+				var/list/set_data
+				try
+					set_name = chronicle_sets[set_index]
+					set_data = chronicle_sets[set_name]
+				catch
+					continue
+				if(!islist(set_data))
+					continue
+				var/set_data_count = 0
+				try
+					set_data_count = length(set_data)
+				catch
+					continue
+				for(var/stat_index in 1 to set_data_count)
+					var/stat
+					try
+						stat = set_data[stat_index]
+						if(!(stat in chosen_chronicle_stats) && GLOB.chronicle_stats[stat])
+							all_stats += stat
+					catch
+						continue
 
-		shuffle_inplace(all_stats)
-		for(var/stat in all_stats)
-			if(length(chosen_chronicle_stats) >= MAX_CHRONICLE_STATS)
-				break
-			chosen_chronicle_stats += stat
-
-	if(length(chosen_chronicle_stats) < MAX_CHRONICLE_STATS)
-		for(var/set_name in chronicle_sets)
-			if(length(chosen_chronicle_stats) >= MAX_CHRONICLE_STATS)
-				break
-			var/list/set_data = chronicle_sets[set_name]
-			for(var/stat in set_data)
+		try
+			shuffle_inplace(all_stats)
+		catch
+			EMPTY_BLOCK_GUARD
+		var/all_stats_count = 0
+		try
+			all_stats_count = length(all_stats)
+		catch
+			all_stats_count = 0
+		for(var/stat_index in 1 to all_stats_count)
+			try
 				if(length(chosen_chronicle_stats) >= MAX_CHRONICLE_STATS)
 					break
-				if(!(stat in chosen_chronicle_stats))
-					chosen_chronicle_stats += stat
+				chosen_chronicle_stats += all_stats[stat_index]
+			catch
+				continue
+
+	try
+		chosen_chronicle_count = length(chosen_chronicle_stats)
+	catch
+		chosen_chronicle_count = 0
+	if(chosen_chronicle_count < MAX_CHRONICLE_STATS && islist(chronicle_sets))
+		var/chronicle_set_count = 0
+		try
+			chronicle_set_count = length(chronicle_sets)
+		catch
+			chronicle_set_count = 0
+		for(var/set_index in 1 to chronicle_set_count)
+			try
+				if(length(chosen_chronicle_stats) >= MAX_CHRONICLE_STATS)
+					break
+			catch
+				break
+			var/set_name
+			var/list/set_data
+			try
+				set_name = chronicle_sets[set_index]
+				set_data = chronicle_sets[set_name]
+			catch
+				continue
+			if(!islist(set_data))
+				continue
+			var/set_data_count = 0
+			try
+				set_data_count = length(set_data)
+			catch
+				continue
+			for(var/stat_index in 1 to set_data_count)
+				try
+					if(length(chosen_chronicle_stats) >= MAX_CHRONICLE_STATS)
+						break
+					var/stat = set_data[stat_index]
+					if(!(stat in chosen_chronicle_stats))
+						chosen_chronicle_stats += stat
+				catch
+					continue
 
 /// Compares influence of all storytellers and sets a new storyteller with a highest influence
 /datum/controller/subsystem/gamemode/proc/pick_most_influential(roundstart = FALSE)
@@ -1400,8 +1543,21 @@ SUBSYSTEM_DEF(gamemode)
 	var/datum/storyteller/highest
 	var/datum/storyteller/lowest
 
-	for(var/storyteller_type in storytellers)
-		var/datum/storyteller/initialized_storyteller = storytellers[storyteller_type]
+	if(!islist(storytellers))
+		return
+	var/storyteller_count = 0
+	try
+		storyteller_count = length(storytellers)
+	catch
+		return
+	for(var/storyteller_index in 1 to storyteller_count)
+		var/storyteller_type
+		var/datum/storyteller/initialized_storyteller
+		try
+			storyteller_type = storytellers[storyteller_index]
+			initialized_storyteller = storytellers[storyteller_type]
+		catch
+			continue
 		if(!initialized_storyteller)
 			continue
 		var/influence = calculate_storyteller_influence(storyteller_type)
@@ -1455,9 +1611,18 @@ SUBSYSTEM_DEF(gamemode)
 	if(SSticker.current_state == GAME_STATE_FINISHED)
 		return
 
-	GLOB.patron_follower_counts.Cut()
+	if(islist(GLOB.patron_follower_counts))
+		try
+			GLOB.patron_follower_counts.Cut()
+		catch
+			GLOB.patron_follower_counts = list()
+	else
+		GLOB.patron_follower_counts = list()
 
-	GLOB.featured_stats[FEATURED_STATS_FLAWS]["entries"] = list()
+	try
+		GLOB.featured_stats[FEATURED_STATS_FLAWS]["entries"] = list()
+	catch
+		EMPTY_BLOCK_GUARD
 
 	var/list/statistics_to_clear = list(
 		STATS_TOTAL_POPULATION,
@@ -1535,11 +1700,27 @@ SUBSYSTEM_DEF(gamemode)
 	var/lowest_constitution
 	var/lowest_endurance
 
-	for(var/client/client in GLOB.clients)
+	var/client_count = 0
+	try
+		client_count = length(GLOB.clients)
+	catch
+		GLOB.clients = list()
+	for(var/client_index in 1 to client_count)
+		var/client/client
+		try
+			client = GLOB.clients[client_index]
+		catch
+			continue
+		if(!client)
+			continue
 		if(roundstart && istype(client?.mob, /mob/dead/new_player))
 			var/mob/dead/new_player/player = client.mob
-			if(player.ready == PLAYER_READY_TO_PLAY)
-				GLOB.patron_follower_counts[client.prefs.selected_patron.name]++
+			if(player.ready == PLAYER_READY_TO_PLAY && client.prefs?.selected_patron)
+				try
+					GLOB.patron_follower_counts[client.prefs.selected_patron.name]++
+				catch
+					GLOB.patron_follower_counts = list()
+					GLOB.patron_follower_counts[client.prefs.selected_patron.name] = 1
 
 		var/mob/living/living = client.mob
 		if(!istype(living))
@@ -1551,7 +1732,11 @@ SUBSYSTEM_DEF(gamemode)
 
 		if(!roundstart)
 			if(living.patron)
-				GLOB.patron_follower_counts[living.patron.name]++
+				try
+					GLOB.patron_follower_counts[living.patron.name]++
+				catch
+					GLOB.patron_follower_counts = list()
+					GLOB.patron_follower_counts[living.patron.name] = 1
 				if(living.job == "Monarch")
 					force_set_round_statistic(STATS_MONARCH_PATRON, living.patron.name)
 		if(living.mind.has_antag_datum(/datum/antagonist/werewolf))
@@ -1766,8 +1951,19 @@ SUBSYSTEM_DEF(gamemode)
 	force_set_round_statistic(STATS_MAMMONS_HELD, total_wealth)
 
 	var/total_bank_wealth = 0
-	for(var/account_name in SStreasury.bank_accounts)
-		total_bank_wealth += SStreasury.bank_accounts[account_name]
+	if(islist(SStreasury.bank_accounts))
+		var/bank_account_count = 0
+		try
+			bank_account_count = length(SStreasury.bank_accounts)
+		catch
+			SStreasury.bank_accounts = list()
+		for(var/bank_account_index in 1 to bank_account_count)
+			var/account_name
+			try
+				account_name = SStreasury.bank_accounts[bank_account_index]
+				total_bank_wealth += SStreasury.bank_accounts[account_name]
+			catch
+				continue
 	force_set_round_statistic(STATS_MAMMONS_IN_BANK, total_bank_wealth)
 
 	var/list/potential_passers = current_valid_humans.Copy()
@@ -1806,14 +2002,46 @@ SUBSYSTEM_DEF(gamemode)
 	var/mob/living/top_pious
 	var/mob/living/top_foul_mouth
 
-	for(var/stat_category in GLOB.chronicle_featured_stats)
-		var/list/category_data = GLOB.chronicle_featured_stats[stat_category]
-		for(var/datum/weakref/mob_ref in category_data)
-			var/mob/living/mob = mob_ref.resolve()
-			if(!mob || !(mob in current_valid_humans))
+	if(!islist(GLOB.chronicle_featured_stats))
+		GLOB.chronicle_featured_stats = list()
+	var/featured_stat_count = 0
+	try
+		featured_stat_count = length(GLOB.chronicle_featured_stats)
+	catch
+		GLOB.chronicle_featured_stats = list()
+	for(var/featured_stat_index in 1 to featured_stat_count)
+		var/stat_category
+		var/list/category_data
+		try
+			stat_category = GLOB.chronicle_featured_stats[featured_stat_index]
+			category_data = GLOB.chronicle_featured_stats[stat_category]
+		catch
+			continue
+		if(!islist(category_data))
+			continue
+		var/category_entry_count = 0
+		try
+			category_entry_count = length(category_data)
+		catch
+			GLOB.chronicle_featured_stats[stat_category] = list()
+			continue
+		for(var/category_entry_index in 1 to category_entry_count)
+			var/datum/weakref/mob_ref
+			var/mob/living/mob
+			var/count
+			try
+				mob_ref = category_data[category_entry_index]
+				mob = mob_ref?.resolve()
+				count = category_data[mob_ref]
+			catch
 				continue
-
-			var/count = category_data[mob_ref]
+			var/is_valid_human = FALSE
+			try
+				is_valid_human = mob && (mob in current_valid_humans)
+			catch
+				is_valid_human = FALSE
+			if(!is_valid_human)
+				continue
 
 			if(stat_category == FEATURED_STATS_JOKESTERS)
 				if(count > highest_laughs)

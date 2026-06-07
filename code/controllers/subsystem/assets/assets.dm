@@ -19,12 +19,32 @@ SUBSYSTEM_DEF(assets)
 	var/datum/asset_transport/newtransport = new newtransporttype ()
 	if (newtransport.validate_config())
 		transport = newtransport
-	transport.Load()
+	try
+		transport.Load()
+	catch
+		transport = new /datum/asset_transport
 
 /datum/controller/subsystem/assets/Initialize(timeofday)
-	for(var/datum/asset/asset as anything in typesof(/datum/asset))
-		if(!IS_ABSTRACT(asset))
-			load_asset_datum(asset)
+	if(!islist(cache))
+		cache = list()
+	var/list/asset_types = typesof(/datum/asset)
+	var/asset_type_count = 0
+	try
+		asset_type_count = length(asset_types)
+	catch
+		asset_type_count = 0
+	for(var/asset_index in 1 to asset_type_count)
+		var/datum/asset/asset
+		try
+			asset = asset_types[asset_index]
+			if(!IS_ABSTRACT(asset))
+				load_asset_datum(asset)
+		catch
+			continue
 
-	transport.Initialize(cache)
+	try
+		transport.Initialize(cache)
+	catch
+		transport = new /datum/asset_transport
+		transport.Initialize(cache)
 	return ..()

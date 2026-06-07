@@ -432,28 +432,62 @@ GLOBAL_LIST_EMPTY(respawncounts)
 	if(connection != "seeker" && connection != "web")//Invalid connection type.
 		return null
 
-	GLOB.clients += src
-	GLOB.keys_by_ckey[ckey] = key
-	GLOB.directory[ckey] = src
+	try
+		GLOB.clients += src
+	catch
+		GLOB.clients = list(src)
+	try
+		GLOB.keys_by_ckey[ckey] = key
+	catch
+		GLOB.keys_by_ckey = list()
+		GLOB.keys_by_ckey[ckey] = key
+	try
+		GLOB.directory[ckey] = src
+	catch
+		GLOB.directory = list()
+		GLOB.directory[ckey] = src
 
 	stat_panel = new(src, "statbrowser")
 	stat_panel.subscribe(src, PROC_REF(on_stat_panel_message))
 
-	GLOB.ahelp_tickets.ClientLogin(src)
+	try
+		GLOB.ahelp_tickets.ClientLogin(src)
+	catch
+		if(GLOB.ahelp_tickets)
+			GLOB.ahelp_tickets.active_tickets = list()
 	var/connecting_admin = FALSE //because de-admined admins connecting should be treated like admins.
 	//Admin Authorisation
-	holder = GLOB.admin_datums[ckey]
+	try
+		holder = GLOB.admin_datums[ckey]
+	catch
+		GLOB.admin_datums = list()
+		holder = null
 
 	if(holder)
-		GLOB.admins |= src
+		try
+			if(!(src in GLOB.admins))
+				GLOB.admins += src
+		catch
+			GLOB.admins = list(src)
 		holder.owner = src
 		connecting_admin = TRUE
-	else if(GLOB.deadmins[ckey])
-		add_verb(src, /client/proc/readmin)
-		connecting_admin = TRUE
+	else
+		var/is_deadmined = FALSE
+		try
+			is_deadmined = GLOB.deadmins[ckey]
+		catch
+			GLOB.deadmins = list()
+		if(is_deadmined)
+			add_verb(src, /client/proc/readmin)
+			connecting_admin = TRUE
 
 	if(CONFIG_GET(flag/autoadmin))
-		if(!GLOB.admin_datums[ckey])
+		var/has_admin_datum = FALSE
+		try
+			has_admin_datum = GLOB.admin_datums[ckey]
+		catch
+			GLOB.admin_datums = list()
+		if(!has_admin_datum)
 			var/datum/admin_rank/autorank
 			for(var/datum/admin_rank/R in GLOB.admin_ranks)
 				if(R.name == CONFIG_GET(string/autoadmin_rank))
@@ -476,16 +510,27 @@ GLOBAL_LIST_EMPTY(respawncounts)
 	native_say = new(src)
 
 	//preferences datum - also holds some persistent data for the client (because we may as well keep these datums to a minimum)
-	prefs = GLOB.preferences_datums[ckey]
+	try
+		prefs = GLOB.preferences_datums[ckey]
+	catch
+		GLOB.preferences_datums = list()
+		prefs = null
 	if(prefs)
 		prefs.parent = src
 	else
 		prefs = new /datum/preferences(src)
-		GLOB.preferences_datums[ckey] = prefs
+		try
+			GLOB.preferences_datums[ckey] = prefs
+		catch
+			GLOB.preferences_datums = list()
+			GLOB.preferences_datums[ckey] = prefs
 	if(!holder)
 		prefs.chat_toggles &= ~CHAT_GHOSTEARS
 		prefs.chat_toggles &= ~CHAT_GHOSTWHISPER
-		prefs.save_preferences()
+		try
+			prefs.save_preferences()
+		catch
+			EMPTY_BLOCK_GUARD
 	prefs.last_ip = address				//these are gonna be used for banning
 	prefs.last_id = computer_id			//these are gonna be used for banning
 	fps = prefs.clientfps
@@ -501,7 +546,17 @@ GLOBAL_LIST_EMPTY(respawncounts)
 
 	var/alert_mob_dupe_login = FALSE
 	if(CONFIG_GET(flag/log_access))
-		for(var/I in GLOB.clients)
+		var/login_client_count = 0
+		try
+			login_client_count = length(GLOB.clients)
+		catch
+			GLOB.clients = list(src)
+		for(var/login_client_index in 1 to login_client_count)
+			var/I
+			try
+				I = GLOB.clients[login_client_index]
+			catch
+				continue
 			if(!I || I == src)
 				continue
 			var/client/C = I
@@ -533,16 +588,27 @@ GLOBAL_LIST_EMPTY(respawncounts)
 	set_right_click_menu_mode(TRUE)
 
 	var/reconnecting = FALSE
-	if(GLOB.player_details[ckey])
-		reconnecting = TRUE
+	try
+		if(!islist(GLOB.player_details))
+			GLOB.player_details = list()
 		player_details = GLOB.player_details[ckey]
-		player_details.byond_version = full_version
-		player_details.byond_build = byond_build
+	catch
+		GLOB.player_details = list()
+		player_details = null
+	if(player_details)
+		reconnecting = TRUE
 	else
 		player_details = new(ckey)
+		try
+			GLOB.player_details[ckey] = player_details
+		catch
+			GLOB.player_details = list()
+			GLOB.player_details[ckey] = player_details
+	try
 		player_details.byond_version = full_version
 		player_details.byond_build = byond_build
-		GLOB.player_details[ckey] = player_details
+	catch
+		EMPTY_BLOCK_GUARD
 
 
 	. = ..()	//calls mob.Login()
@@ -554,10 +620,18 @@ GLOBAL_LIST_EMPTY(respawncounts)
 			log_access("Failed Login: [key] - Spoofed byond version")
 			qdel(src)
 
-		if (num2text(byond_build) in GLOB.blacklisted_builds)
+		var/build_is_blacklisted = FALSE
+		var/blacklisted_build_reason
+		try
+			build_is_blacklisted = islist(GLOB.blacklisted_builds) && (num2text(byond_build) in GLOB.blacklisted_builds)
+			if(build_is_blacklisted)
+				blacklisted_build_reason = GLOB.blacklisted_builds[num2text(byond_build)]
+		catch
+			GLOB.blacklisted_builds = list()
+		if (build_is_blacklisted)
 			log_access("Failed login: [key] - blacklisted byond version")
 			to_chat(src, "<span class='danger'>My version of byond is blacklisted.</span>")
-			to_chat(src, "<span class='danger'>Byond build [byond_build] ([byond_version].[byond_build]) has been blacklisted for the following reason: [GLOB.blacklisted_builds[num2text(byond_build)]].</span>")
+			to_chat(src, "<span class='danger'>Byond build [byond_build] ([byond_version].[byond_build]) has been blacklisted for the following reason: [blacklisted_build_reason].</span>")
 			to_chat(src, "<span class='danger'>Please download a new version of byond. If [byond_build] is the latest, you can go to <a href=\"https://secure.byond.com/download/build\">BYOND's website</a> to download other versions.</span>")
 			if(connecting_admin)
 				to_chat(src, "As an admin, you are being allowed to continue using this version, but please consider changing byond versions")
@@ -566,19 +640,31 @@ GLOBAL_LIST_EMPTY(respawncounts)
 				return
 
 	if(SSinput.initialized)
-		set_macros()
-		update_movement_keys()
+		try
+			set_macros()
+		catch
+			EMPTY_BLOCK_GUARD
+		try
+			update_movement_keys()
+		catch
+			EMPTY_BLOCK_GUARD
 
 	// Initialize stat panel
-	stat_panel.initialize(
-		inline_html = file("html/statbrowser.html"),
-		inline_js = file("html/statbrowser.js"),
-		inline_css = file("html/statbrowser.css"),
-	)
-	addtimer(CALLBACK(src, PROC_REF(check_panel_loaded)), 30 SECONDS)
+	try
+		stat_panel.initialize(
+			inline_html = file("html/statbrowser.html"),
+			inline_js = file("html/statbrowser.js"),
+			inline_css = file("html/statbrowser.css"),
+		)
+		addtimer(CALLBACK(src, PROC_REF(check_panel_loaded)), 30 SECONDS)
+	catch
+		EMPTY_BLOCK_GUARD
 
 	// Initalize tgui panel
-	tgui_panel.initialize()
+	try
+		tgui_panel.initialize()
+	catch
+		EMPTY_BLOCK_GUARD
 
 	INVOKE_ASYNC(src, PROC_REF(acquire_dpi))
 
@@ -663,8 +749,14 @@ GLOBAL_LIST_EMPTY(respawncounts)
 		if (CONFIG_GET(flag/irc_first_connection_alert))
 			send2irc_adminless_only("new_byond_user", "[key_name(src)] (IP: [address], ID: [computer_id]) is a new BYOND account [account_age] day[(account_age==1?"":"s")] old, created on [account_join_date].")
 	get_message_output("watchlist entry", ckey)
-	check_overwatch()
-	validate_key_in_db()
+	try
+		check_overwatch()
+	catch
+		EMPTY_BLOCK_GUARD
+	try
+		validate_key_in_db()
+	catch
+		EMPTY_BLOCK_GUARD
 
 	// If we aren't already generating a ban cache, fire off a build request
 	// This way hopefully any users of request_ban_cache will never need to yield
@@ -683,10 +775,34 @@ GLOBAL_LIST_EMPTY(respawncounts)
 		else
 			stat_panel.send_message("unread_changelog")
 
-	if(ckey in GLOB.clientmessages)
-		for(var/message in GLOB.clientmessages[ckey])
-			to_chat(src, message)
-		GLOB.clientmessages.Remove(ckey)
+	var/has_client_messages = FALSE
+	try
+		has_client_messages = islist(GLOB.clientmessages) && (ckey in GLOB.clientmessages)
+	catch
+		GLOB.clientmessages = list()
+	if(has_client_messages)
+		var/list/client_messages
+		try
+			client_messages = GLOB.clientmessages[ckey]
+		catch
+			client_messages = null
+		if(islist(client_messages))
+			var/message_count = 0
+			try
+				message_count = length(client_messages)
+			catch
+				message_count = 0
+			for(var/message_index in 1 to message_count)
+				var/message
+				try
+					message = client_messages[message_index]
+					to_chat(src, message)
+				catch
+					continue
+		try
+			GLOB.clientmessages.Remove(ckey)
+		catch
+			EMPTY_BLOCK_GUARD
 
 	if(CONFIG_GET(flag/autoconvert_notes))
 		convert_notes_sql(ckey)
@@ -702,26 +818,68 @@ GLOBAL_LIST_EMPTY(respawncounts)
 	if(!tooltips)
 		tooltips = new /datum/tooltip(src)
 
-	var/list/topmenus = GLOB.menulist[/datum/verbs/menu]
-	for(var/thing in topmenus)
-		var/datum/verbs/menu/topmenu = thing
-		var/topmenuname = "[topmenu]"
-		if(topmenuname == "[topmenu.type]")
-			var/list/tree = splittext(topmenuname, "/")
-			topmenuname = tree[tree.len]
-		winset(src, "[topmenu.type]", "parent=menu;name=[url_encode(topmenuname)]")
-		var/list/entries = topmenu.Generate_list(src)
-		for(var/child in entries)
-			winset(src, "[child]", "[entries[child]]")
-			if(!ispath(child, /datum/verbs/menu))
-				var/procpath/verbpath = child
-				if (copytext(verbpath.name,1,2) != "@")
-					new child(src)
+	var/list/topmenus = null
+	try
+		topmenus = GLOB.menulist[/datum/verbs/menu]
+	catch
+		topmenus = null
+	if(islist(topmenus))
+		var/topmenu_count = 0
+		try
+			topmenu_count = length(topmenus)
+		catch
+			topmenu_count = 0
+		for(var/topmenu_index in 1 to topmenu_count)
+			var/datum/verbs/menu/topmenu
+			try
+				topmenu = topmenus[topmenu_index]
+			catch
+				continue
+			if(!topmenu)
+				continue
+			var/topmenuname = "[topmenu]"
+			if(topmenuname == "[topmenu.type]")
+				var/list/tree = splittext(topmenuname, "/")
+				topmenuname = tree[tree.len]
+			try
+				winset(src, "[topmenu.type]", "parent=menu;name=[url_encode(topmenuname)]")
+				var/list/entries = topmenu.Generate_list(src)
+				if(islist(entries))
+					var/entry_count = 0
+					try
+						entry_count = length(entries)
+					catch
+						entry_count = 0
+					for(var/entry_index in 1 to entry_count)
+						var/child
+						try
+							child = entries[entry_index]
+							winset(src, "[child]", "[entries[child]]")
+							if(!ispath(child, /datum/verbs/menu))
+								var/procpath/verbpath = child
+								if (copytext(verbpath.name,1,2) != "@")
+									new child(src)
+						catch
+							continue
+			catch
+				continue
 
-	for(var/thing in prefs.menuoptions)
-		var/datum/verbs/menu/menuitem = GLOB.menulist[thing]
-		if (menuitem)
-			menuitem.Load_checked(src)
+	if(islist(prefs?.menuoptions))
+		var/menuoption_count = 0
+		try
+			menuoption_count = length(prefs.menuoptions)
+		catch
+			menuoption_count = 0
+		for(var/menuoption_index in 1 to menuoption_count)
+			var/thing
+			var/datum/verbs/menu/menuitem
+			try
+				thing = prefs.menuoptions[menuoption_index]
+				menuitem = GLOB.menulist[thing]
+				if (menuitem)
+					menuitem.Load_checked(src)
+			catch
+				continue
 
 	if(byond_version >= 516) // byondstorage handled by tgui
 		winset(src, null, "browser-options=find,devtools")
@@ -755,9 +913,22 @@ GLOBAL_LIST_EMPTY(respawncounts)
 	return ..()
 
 /client/Destroy()
-	STOP_PROCESSING(SSmousecharge, src)
+	try
+		STOP_PROCESSING(SSmousecharge, src)
+	catch
+		EMPTY_BLOCK_GUARD
 	if(holder)
-		for(var/I in GLOB.clients)
+		var/client_count = 0
+		try
+			client_count = length(GLOB.clients)
+		catch
+			GLOB.clients = list()
+		for(var/client_index in 1 to client_count)
+			var/I
+			try
+				I = GLOB.clients[client_index]
+			catch
+				continue
 			if(!I || I == src)
 				continue
 			var/client/C = I
@@ -766,32 +937,73 @@ GLOBAL_LIST_EMPTY(respawncounts)
 					to_chat(C, "Admin Logout: [ckey]")
 		adminGreet(1)
 		holder.owner = null
-		GLOB.admins -= src
+		if(islist(GLOB.admins))
+			try
+				GLOB.admins -= src
+			catch
+				GLOB.admins = list()
 
-	GLOB.clients -= src
-	GLOB.directory -= ckey
+	if(islist(GLOB.clients))
+		try
+			GLOB.clients -= src
+		catch
+			GLOB.clients = list()
+	if(islist(GLOB.directory))
+		try
+			GLOB.directory -= ckey
+		catch
+			GLOB.directory = list()
 
 	QDEL_NULL(tgui_panel)
 
 	log_access("Logout: [key_name(src)]")
-	GLOB.ahelp_tickets.ClientLogout(src)
+	try
+		GLOB.ahelp_tickets.ClientLogout(src)
+	catch
+		if(GLOB.ahelp_tickets)
+			GLOB.ahelp_tickets.active_tickets = list()
 
-	if(length(credits))
-		QDEL_LIST(credits)
+	if(islist(credits))
+		try
+			if(length(credits))
+				QDEL_LIST(credits)
+		catch
+			credits = list()
 
 	QDEL_NULL(loot_panel)
 
 	if(movingmob != null)
-		movingmob.client_mobs_in_contents -= mob
-		UNSETEMPTY(movingmob.client_mobs_in_contents)
+		if(islist(movingmob.client_mobs_in_contents))
+			try
+				movingmob.client_mobs_in_contents -= mob
+				UNSETEMPTY(movingmob.client_mobs_in_contents)
+			catch
+				movingmob.client_mobs_in_contents = null
 
-	QDEL_LIST_ASSOC_VAL(char_render_holders)
+	if(islist(char_render_holders))
+		try
+			QDEL_LIST_ASSOC_VAL(char_render_holders)
+		catch
+			char_render_holders = null
 
-	SSjob.save_player_boosts(ckey)
-	SSambience.remove_ambience_client(src)
-	SSmouse_entered.hovers -= src
+	try
+		SSjob.save_player_boosts(ckey)
+	catch
+		EMPTY_BLOCK_GUARD
+	try
+		SSambience.remove_ambience_client(src)
+	catch
+		EMPTY_BLOCK_GUARD
+	if(SSmouse_entered && islist(SSmouse_entered.hovers))
+		try
+			SSmouse_entered.hovers -= src
+		catch
+			SSmouse_entered.hovers = list()
 	seen_messages = null
-	Master.UpdateTickRate()
+	try
+		Master.UpdateTickRate()
+	catch
+		EMPTY_BLOCK_GUARD
 	..() //Even though we're going to be hard deleted there are still some things that want to know the destroy is happening
 	return QDEL_HINT_HARDDEL_NOW
 
@@ -826,7 +1038,12 @@ GLOBAL_LIST_EMPTY(respawncounts)
 	if (src.holder && src.holder.rank)
 		admin_rank = src.holder.rank.name
 	else
-		if (!GLOB.deadmins[ckey] && check_randomizer(connectiontopic))
+		var/is_deadmined_for_randomizer = FALSE
+		try
+			is_deadmined_for_randomizer = GLOB.deadmins[ckey]
+		catch
+			GLOB.deadmins = list()
+		if (!is_deadmined_for_randomizer && check_randomizer(connectiontopic))
 			return
 
 	var/new_player
@@ -838,7 +1055,12 @@ GLOBAL_LIST_EMPTY(respawncounts)
 		qdel(query_client_in_db)
 		return
 	if(!query_client_in_db.NextRow())
-		if (CONFIG_GET(flag/panic_bunker) && !holder && !GLOB.deadmins[ckey])
+		var/is_deadmined_for_panic_bunker = FALSE
+		try
+			is_deadmined_for_panic_bunker = GLOB.deadmins[ckey]
+		catch
+			GLOB.deadmins = list()
+		if (CONFIG_GET(flag/panic_bunker) && !holder && !is_deadmined_for_panic_bunker)
 			log_access("Failed Login: [key] - New account attempting to connect during panic bunker")
 			message_admins("<span class='adminnotice'>Failed Login: [key] - New account attempting to connect during panic bunker</span>")
 			to_chat(src, CONFIG_GET(string/panic_bunker_message))
@@ -940,16 +1162,27 @@ GLOBAL_LIST_EMPTY(respawncounts)
 
 /client/proc/validate_key_in_db()
 	var/sql_key
-	var/datum/DBQuery/query_check_byond_key = SSdbcore.NewQuery(
-		"SELECT byond_key FROM [format_table_name("player")] WHERE ckey = :ckey",
-		list("ckey" = ckey)
-	)
-	if(!query_check_byond_key.Execute())
-		qdel(query_check_byond_key)
+	var/datum/DBQuery/query_check_byond_key
+	try
+		query_check_byond_key = SSdbcore.NewQuery(
+			"SELECT byond_key FROM [format_table_name("player")] WHERE ckey = :ckey",
+			list("ckey" = ckey)
+		)
+	catch
 		return
-	if(query_check_byond_key.NextRow())
-		sql_key = query_check_byond_key.item[1]
-	qdel(query_check_byond_key)
+	try
+		if(!query_check_byond_key?.Execute())
+			qdel(query_check_byond_key)
+			return
+		if(query_check_byond_key.NextRow())
+			sql_key = query_check_byond_key.item[1]
+		qdel(query_check_byond_key)
+	catch
+		try
+			qdel(query_check_byond_key)
+		catch
+			EMPTY_BLOCK_GUARD
+		return
 	if(key != sql_key)
 		var/list/http = world.Export("http://byond.com/members/[ckey]?format=text")
 		if(!http)
@@ -960,22 +1193,41 @@ GLOBAL_LIST_EMPTY(respawncounts)
 			var/regex/R = regex("\\tkey = \"(.+)\"")
 			if(R.Find(F))
 				var/web_key = R.group[1]
-				var/datum/DBQuery/query_update_byond_key = SSdbcore.NewQuery(
-					"UPDATE [format_table_name("player")] SET byond_key = :byond_key WHERE ckey = :ckey",
-					list("byond_key" = web_key, "ckey" = ckey)
-				)
-				query_update_byond_key.Execute()
-				qdel(query_update_byond_key)
+				var/datum/DBQuery/query_update_byond_key
+				try
+					query_update_byond_key = SSdbcore.NewQuery(
+						"UPDATE [format_table_name("player")] SET byond_key = :byond_key WHERE ckey = :ckey",
+						list("byond_key" = web_key, "ckey" = ckey)
+					)
+					query_update_byond_key?.Execute()
+					qdel(query_update_byond_key)
+				catch
+					try
+						qdel(query_update_byond_key)
+					catch
+						EMPTY_BLOCK_GUARD
 			else
 				CRASH("Key check regex failed for [ckey]")
 
 /client/proc/update_ambience_pref()
 	if(prefs.toggles & SOUND_AMBIENCE)
-		if(SSambience.ambience_listening_clients[src] > world.time)
+		var/next_ambience_time = 0
+		try
+			next_ambience_time = SSambience.ambience_listening_clients[src]
+		catch
+			SSambience.ambience_listening_clients = list()
+		if(next_ambience_time > world.time)
 			return // If already properly set we don't want to reset the timer.
-		SSambience.ambience_listening_clients[src] = world.time + 10 SECONDS //Just wait 10 seconds before the next one aight mate? cheers.
+		try
+			SSambience.ambience_listening_clients[src] = world.time + 10 SECONDS //Just wait 10 seconds before the next one aight mate? cheers.
+		catch
+			SSambience.ambience_listening_clients = list()
+			SSambience.ambience_listening_clients[src] = world.time + 10 SECONDS
 	else
-		SSambience.remove_ambience_client(src)
+		try
+			SSambience.remove_ambience_client(src)
+		catch
+			EMPTY_BLOCK_GUARD
 
 /client/proc/check_randomizer(topic)
 	. = FALSE
@@ -1098,10 +1350,16 @@ GLOBAL_LIST_EMPTY(respawncounts)
 
 /client/proc/check_overwatch()
 	var/failed = FALSE
-	SSoverwatch.CollectClientData(src)
-	failed = SSoverwatch.HandleClientAccessCheck(src)
+	try
+		SSoverwatch.CollectClientData(src)
+		failed = SSoverwatch.HandleClientAccessCheck(src)
+	catch
+		return FALSE
 	if(!failed)
-		SSoverwatch.HandleASNbanCheck(src)
+		try
+			SSoverwatch.HandleASNbanCheck(src)
+		catch
+			EMPTY_BLOCK_GUARD
 
 	var/string
 	if(ip_info)
@@ -1122,9 +1380,17 @@ GLOBAL_LIST_EMPTY(respawncounts)
 	return failed
 
 /client/Click(atom/object, atom/location, control, params)
-	if(SEND_SIGNAL(src, COMSIG_CLIENT_CLICK_DIRTY, object, location, control, params, usr))
-		return
-	if(isatom(object) && HAS_TRAIT(mob, TRAIT_IN_FRENZY))
+	try
+		if(SEND_SIGNAL(src, COMSIG_CLIENT_CLICK_DIRTY, object, location, control, params, usr))
+			return
+	catch
+		EMPTY_BLOCK_GUARD
+	var/in_frenzy = FALSE
+	try
+		in_frenzy = mob && isatom(object) && HAS_TRAIT(mob, TRAIT_IN_FRENZY)
+	catch
+		in_frenzy = FALSE
+	if(in_frenzy)
 		return
 
 	if(click_intercept_time)
@@ -1134,7 +1400,11 @@ GLOBAL_LIST_EMPTY(respawncounts)
 		click_intercept_time = 0 //Just reset. Let's not keep re-checking forever.
 
 	var/ab = FALSE
-	var/list/modifiers = params2list(params)
+	var/list/modifiers = list()
+	try
+		modifiers = params2list(params)
+	catch
+		modifiers = list()
 
 	var/dragged = LAZYACCESS(modifiers, BUTTON_DRAGGED)
 	if(dragged)
@@ -1146,16 +1416,29 @@ GLOBAL_LIST_EMPTY(respawncounts)
 	var/mcl = CONFIG_GET(number/minute_click_limit)
 	if (!holder && mcl)
 		var/minute = round(world.time, 600)
-		if (!clicklimiter)
+		if (!islist(clicklimiter))
 			clicklimiter = new(LIMITER_SIZE)
-		if (minute != clicklimiter[CURRENT_MINUTE])
+		var/minute_count = 0
+		var/admins_warned_at = 0
+		try
+			if (minute != clicklimiter[CURRENT_MINUTE])
+				clicklimiter[CURRENT_MINUTE] = minute
+				clicklimiter[MINUTE_COUNT] = 0
+			clicklimiter[MINUTE_COUNT] += 1+(ab)
+			minute_count = clicklimiter[MINUTE_COUNT]
+			admins_warned_at = clicklimiter[ADMINSWARNED_AT]
+		catch
+			clicklimiter = new(LIMITER_SIZE)
 			clicklimiter[CURRENT_MINUTE] = minute
-			clicklimiter[MINUTE_COUNT] = 0
-		clicklimiter[MINUTE_COUNT] += 1+(ab)
-		if (clicklimiter[MINUTE_COUNT] > mcl)
+			clicklimiter[MINUTE_COUNT] = 1+(ab)
+			minute_count = clicklimiter[MINUTE_COUNT]
+		if (minute_count > mcl)
 			var/msg = "Your previous click was ignored because you've done too many in a minute."
-			if (minute != clicklimiter[ADMINSWARNED_AT]) //only one admin message per-minute. (if they spam the admins can just boot/ban them)
-				clicklimiter[ADMINSWARNED_AT] = minute
+			if (minute != admins_warned_at) //only one admin message per-minute. (if they spam the admins can just boot/ban them)
+				try
+					clicklimiter[ADMINSWARNED_AT] = minute
+				catch
+					EMPTY_BLOCK_GUARD
 
 				msg += " Administrators have been informed."
 				if (ab)
@@ -1170,13 +1453,21 @@ GLOBAL_LIST_EMPTY(respawncounts)
 	var/scl = CONFIG_GET(number/second_click_limit)
 	if (!holder && scl)
 		var/second = round(world.time, 10)
-		if (!clicklimiter)
+		if (!islist(clicklimiter))
 			clicklimiter = new(LIMITER_SIZE)
-		if (second != clicklimiter[CURRENT_SECOND])
+		var/second_count = 0
+		try
+			if (second != clicklimiter[CURRENT_SECOND])
+				clicklimiter[CURRENT_SECOND] = second
+				clicklimiter[SECOND_COUNT] = 0
+			clicklimiter[SECOND_COUNT] += 1+(!!ab)
+			second_count = clicklimiter[SECOND_COUNT]
+		catch
+			clicklimiter = new(LIMITER_SIZE)
 			clicklimiter[CURRENT_SECOND] = second
-			clicklimiter[SECOND_COUNT] = 0
-		clicklimiter[SECOND_COUNT] += 1+(!!ab)
-		if (clicklimiter[SECOND_COUNT] > scl)
+			clicklimiter[SECOND_COUNT] = 1+(!!ab)
+			second_count = clicklimiter[SECOND_COUNT]
+		if (second_count > scl)
 //			to_chat(src, "<span class='danger'>My previous click was ignored because you've done too many in a second</span>")
 			return
 
@@ -1194,7 +1485,10 @@ GLOBAL_LIST_EMPTY(respawncounts)
 	else
 		winset(src, null, "input.focus=true command=activeInput input.background-color=[COLOR_INPUT_ENABLED] input.text-color = #EEEEEE")
 
-	SEND_SIGNAL(src, COMSIG_CLIENT_CLICK, object, location, control, params, usr)
+	try
+		SEND_SIGNAL(src, COMSIG_CLIENT_CLICK, object, location, control, params, usr)
+	catch
+		EMPTY_BLOCK_GUARD
 
 	..()
 
@@ -1424,10 +1718,19 @@ GLOBAL_LIST_EMPTY(respawncounts)
 
 /client/proc/enable_seasonal_buys()
 	if(!SStriumphs.initialized)
-		SStriumphs.pending_clients_seasonal += src
+		try
+			if(!islist(SStriumphs.pending_clients_seasonal))
+				SStriumphs.pending_clients_seasonal = list()
+			if(!(src in SStriumphs.pending_clients_seasonal))
+				SStriumphs.pending_clients_seasonal += src
+		catch
+			SStriumphs.pending_clients_seasonal = list(src)
 		return
 
-	SStriumphs.activate_seasonal_buys(src)
+	try
+		SStriumphs.activate_seasonal_buys(src)
+	catch
+		EMPTY_BLOCK_GUARD
 
 /client/proc/check_panel_loaded()
 	if(stat_panel.is_ready())

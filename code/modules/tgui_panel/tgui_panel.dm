@@ -44,21 +44,44 @@
 	sleep(1 TICKS)
 	initialized_at = world.time
 	// Perform a clean initialization
-	window.initialize(
-		strict_mode = TRUE,
-		assets = list(
-			get_asset_datum(/datum/asset/simple/tgui_panel),
-		))
+	var/list/init_assets = list()
+	try
+		init_assets += get_asset_datum(/datum/asset/simple/tgui_panel)
+	catch
+		EMPTY_BLOCK_GUARD
+	try
+		window.initialize(
+			strict_mode = TRUE,
+			assets = init_assets,
+		)
+	catch
+		broken = TRUE
+		return
 
-	window.send_asset(get_asset_datum(/datum/asset/simple/namespaced/fontawesome))
-	window.send_asset(get_asset_datum(/datum/asset/simple/namespaced/tgfont))
-	window.send_asset(get_asset_datum(/datum/asset/simple/namespaced/fonts))
-	window.send_asset(get_asset_datum(/datum/asset/spritesheet_batched/chat))
+	try
+		window.send_asset(get_asset_datum(/datum/asset/simple/namespaced/fontawesome))
+	catch
+		EMPTY_BLOCK_GUARD
+	try
+		window.send_asset(get_asset_datum(/datum/asset/simple/namespaced/tgfont))
+	catch
+		EMPTY_BLOCK_GUARD
+	try
+		window.send_asset(get_asset_datum(/datum/asset/simple/namespaced/fonts))
+	catch
+		EMPTY_BLOCK_GUARD
+	try
+		window.send_asset(get_asset_datum(/datum/asset/spritesheet_batched/chat))
+	catch
+		EMPTY_BLOCK_GUARD
 
 	// Other setup
-	request_telemetry()
-	addtimer(CALLBACK(src, PROC_REF(on_initialize_timed_out)), 5 SECONDS)
-	window.send_message("testTelemetryCommand")
+	try
+		request_telemetry()
+		addtimer(CALLBACK(src, PROC_REF(on_initialize_timed_out)), 5 SECONDS)
+		window.send_message("testTelemetryCommand")
+	catch
+		EMPTY_BLOCK_GUARD
 
 /**
  * private

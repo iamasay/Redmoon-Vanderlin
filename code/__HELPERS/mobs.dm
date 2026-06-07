@@ -53,13 +53,34 @@
 	return MANDATORY_FEATURE_LIST
 
 /proc/random_unique_name(gender, attempts_to_find_unique_name=10)
-	for(var/i in 1 to attempts_to_find_unique_name)
-		if(gender==FEMALE)
-			. = capitalize(pick(GLOB.first_names_female)) + " " + capitalize(pick(GLOB.last_names))
-		else
-			. = capitalize(pick(GLOB.first_names_male)) + " " + capitalize(pick(GLOB.last_names))
+	var/list/first_pool = null
+	var/list/last_pool = null
+	if(gender == FEMALE)
+		first_pool = GLOB.first_names_female
+	else
+		first_pool = GLOB.first_names_male
+	last_pool = GLOB.last_names
 
-		if(!findname(.))
+	if(!islist(first_pool) || !length(first_pool))
+		first_pool = list("Nameless")
+	if(!islist(last_pool) || !length(last_pool))
+		last_pool = list("Wanderer")
+
+	for(var/i in 1 to attempts_to_find_unique_name)
+		var/first = "Nameless"
+		var/last = "Wanderer"
+		try
+			first = capitalize(pick(first_pool))
+			last = capitalize(pick(last_pool))
+		catch
+			first = "Nameless"
+			last = "Wanderer"
+		. = "[first] [last]"
+
+		try
+			if(!findname(.))
+				break
+		catch
 			break
 
 

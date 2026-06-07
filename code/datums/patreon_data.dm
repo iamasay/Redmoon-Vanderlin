@@ -33,8 +33,20 @@ GLOBAL_LIST_EMPTY(donator_data_by_ckey)
 	add_to_global_list()
 
 /datum/patreon_data/proc/add_to_global_list()
-	GLOB.donator_data_by_key[owner.key] = access_rank
-	GLOB.donator_data_by_ckey[owner.ckey] = access_rank
+	try
+		if(!islist(GLOB.donator_data_by_key))
+			GLOB.donator_data_by_key = list()
+		GLOB.donator_data_by_key[owner.key] = access_rank
+	catch
+		GLOB.donator_data_by_key = list()
+		GLOB.donator_data_by_key[owner.key] = access_rank
+	try
+		if(!islist(GLOB.donator_data_by_ckey))
+			GLOB.donator_data_by_ckey = list()
+		GLOB.donator_data_by_ckey[owner.ckey] = access_rank
+	catch
+		GLOB.donator_data_by_ckey = list()
+		GLOB.donator_data_by_ckey[owner.ckey] = access_rank
 
 /datum/patreon_data/proc/fetch_key_and_rank()
 	if(!SSdbcore.IsConnectedCross())
@@ -63,9 +75,19 @@ GLOBAL_LIST_EMPTY(donator_data_by_ckey)
 			access_rank =  ACCESS_NUKIE_RANK
 
 /datum/patreon_data/proc/has_access(rank)
-	if(owner.ckey in GLOB.contributors)
+	var/is_contributor = FALSE
+	var/is_deadmined = FALSE
+	try
+		is_contributor = islist(GLOB.contributors) && (owner.ckey in GLOB.contributors)
+	catch
+		GLOB.contributors = list()
+	try
+		is_deadmined = islist(GLOB.deadmins) && (owner.ckey in GLOB.deadmins)
+	catch
+		is_deadmined = FALSE
+	if(is_contributor)
 		return TRUE
-	if(owner.holder || (owner.ckey in GLOB.deadmins))
+	if(owner.holder || is_deadmined)
 		return TRUE
 	// Only care about access if the above isn't true.
 	if(!access_rank)
@@ -78,12 +100,22 @@ GLOBAL_LIST_EMPTY(donator_data_by_ckey)
 	return owned_rank && owned_rank != NO_RANK && owned_rank != UNSUBBED
 
 /proc/key_is_donator(key)
-	if(GLOB.donator_data_by_key[key])
+	var/is_donator_key = FALSE
+	try
+		is_donator_key = islist(GLOB.donator_data_by_key) && GLOB.donator_data_by_key[key]
+	catch
+		GLOB.donator_data_by_key = list()
+	if(is_donator_key)
 		return TRUE
 	return FALSE
 
 /proc/ckey_is_donator(ckey)
-	if(GLOB.donator_data_by_ckey[ckey])
+	var/is_donator_ckey = FALSE
+	try
+		is_donator_ckey = islist(GLOB.donator_data_by_ckey) && GLOB.donator_data_by_ckey[ckey]
+	catch
+		GLOB.donator_data_by_ckey = list()
+	if(is_donator_ckey)
 		return TRUE
 	return FALSE
 

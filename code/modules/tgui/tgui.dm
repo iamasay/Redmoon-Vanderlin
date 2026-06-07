@@ -96,12 +96,15 @@
 	opened_at = world.time
 	window.acquire_lock(src)
 	if(!window.is_ready())
+		var/list/init_assets = list()
+		try
+			init_assets += get_asset_datum(/datum/asset/simple/tgui)
+		catch
+			EMPTY_BLOCK_GUARD
 		window.initialize(
 			strict_mode = TRUE,
 			fancy = user.client.prefs.tgui_fancy,
-			assets = list(
-				get_asset_datum(/datum/asset/simple/tgui),
-			))
+			assets = init_assets)
 	else
 		window.send_message("ping")
 	send_assets()
@@ -113,13 +116,43 @@
 	return TRUE
 
 /datum/tgui/proc/send_assets()
-	var/flush_queue = window.send_asset(get_asset_datum(/datum/asset/simple/namespaced/fontawesome))
-	flush_queue |= window.send_asset(get_asset_datum(/datum/asset/simple/namespaced/tgfont))
-	flush_queue |= window.send_asset(get_asset_datum(/datum/asset/simple/namespaced/fonts))
-	flush_queue |= window.send_asset(get_asset_datum(/datum/asset/json/icon_ref_map))
+	var/flush_queue = FALSE
+	try
+		flush_queue = window.send_asset(get_asset_datum(/datum/asset/simple/namespaced/fontawesome))
+	catch
+		EMPTY_BLOCK_GUARD
+	try
+		flush_queue |= window.send_asset(get_asset_datum(/datum/asset/simple/namespaced/tgfont))
+	catch
+		EMPTY_BLOCK_GUARD
+	try
+		flush_queue |= window.send_asset(get_asset_datum(/datum/asset/simple/namespaced/fonts))
+	catch
+		EMPTY_BLOCK_GUARD
+	try
+		flush_queue |= window.send_asset(get_asset_datum(/datum/asset/json/icon_ref_map))
+	catch
+		EMPTY_BLOCK_GUARD
 
-	for(var/datum/asset/asset in src_object.ui_assets(user))
-		flush_queue |= window.send_asset(asset)
+	var/list/ui_assets = list()
+	try
+		ui_assets = src_object.ui_assets(user)
+		if(!islist(ui_assets))
+			ui_assets = list()
+	catch
+		ui_assets = list()
+	var/ui_asset_count = 0
+	try
+		ui_asset_count = length(ui_assets)
+	catch
+		ui_asset_count = 0
+	for(var/ui_asset_index in 1 to ui_asset_count)
+		var/datum/asset/asset
+		try
+			asset = ui_assets[ui_asset_index]
+			flush_queue |= window.send_asset(asset)
+		catch
+			continue
 
 	if(flush_queue)
 		user.client.browse_queue_flush()

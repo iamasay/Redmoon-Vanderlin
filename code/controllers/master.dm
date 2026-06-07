@@ -107,11 +107,38 @@ GLOBAL_REAL(Master, /datum/controller/master)
 	// Tell qdel() to Del() this object.
 	return QDEL_HINT_HARDDEL_NOW
 
+/datum/controller/master/proc/ensure_subsystems_list()
+	if(islist(subsystems))
+		try
+			var/subsystem_count = length(subsystems)
+			if(subsystem_count >= 0)
+				return TRUE
+		catch
+			EMPTY_BLOCK_GUARD
+	subsystems = list()
+	var/list/subsystem_types = subtypesof(/datum/controller/subsystem)
+	sortTim(subsystem_types, GLOBAL_PROC_REF(cmp_subsystem_init))
+	for(var/subsystem_type in subsystem_types)
+		subsystems += new subsystem_type
+	return TRUE
+
 /datum/controller/master/Shutdown()
 	processing = FALSE
 	sortTim(subsystems, GLOBAL_PROC_REF(cmp_subsystem_init))
 	reverseRange(subsystems)
-	for(var/datum/controller/subsystem/ss in subsystems)
+	var/subsystem_count = 0
+	try
+		subsystem_count = length(subsystems)
+	catch
+		return
+	for(var/subsystem_index in 1 to subsystem_count)
+		var/datum/controller/subsystem/ss
+		try
+			ss = subsystems[subsystem_index]
+		catch
+			continue
+		if(!istype(ss))
+			continue
 		log_world("Shutting down [ss.name] subsystem...")
 		ss.Shutdown()
 	log_world("Shutdown complete")
@@ -199,7 +226,20 @@ GLOBAL_REAL(Master, /datum/controller/master)
 	var/start_timeofday = REALTIMEOFDAY
 	// Initialize subsystems.
 	current_ticklimit = CONFIG_GET(number/tick_limit_mc_init)
-	for (var/datum/controller/subsystem/SS as anything in subsystems)
+	ensure_subsystems_list()
+	var/init_subsystem_count = 0
+	try
+		init_subsystem_count = length(subsystems)
+	catch
+		init_subsystem_count = 0
+	for (var/init_subsystem_index in 1 to init_subsystem_count)
+		var/datum/controller/subsystem/SS
+		try
+			SS = subsystems[init_subsystem_index]
+		catch
+			continue
+		if(!istype(SS))
+			continue
 		if (SS.flags & SS_NO_INIT)
 			continue
 #ifdef LOWMEMORYMODE
@@ -271,15 +311,30 @@ GLOBAL_REAL(Master, /datum/controller/master)
 	if (rtn2 <= 0)
 		log_game("Failed to recreate MC (Error code: [rtn2]), it's up to the failsafe now")
 		message_admins("Failed to recreate MC (Error code: [rtn2]), it's up to the failsafe now")
-		Failsafe.defcon = 2
+		if(!Failsafe)
+			new /datum/controller/failsafe()
+		if(Failsafe)
+			Failsafe.defcon = 2
 
 // Main loop.
 /datum/controller/master/proc/Loop()
 	. = -1
 	#ifdef LOWMEMORYMODE
 	if(!initialized_all)
-		var/total_count = length(subsystems)
-		for (var/datum/controller/subsystem/SS in subsystems)
+		var/total_count = 0
+		try
+			total_count = length(subsystems)
+		catch
+			total_count = 0
+		for (var/lowmem_subsystem_index in 1 to total_count)
+			var/datum/controller/subsystem/SS
+			try
+				SS = subsystems[lowmem_subsystem_index]
+			catch
+				continue
+			if(!istype(SS))
+				total_count--
+				continue
 			if(SS.initialized)
 				total_count--
 				continue
@@ -304,8 +359,22 @@ GLOBAL_REAL(Master, /datum/controller/master)
 	var/list/tickersubsystems = list()
 	var/list/runlevel_sorted_subsystems = list(list())	//ensure we always have at least one runlevel
 	var/timer = world.time
-	for (var/thing in subsystems)
+	ensure_subsystems_list()
+	var/subsystem_count = 0
+	try
+		subsystem_count = length(subsystems)
+	catch
+		ensure_subsystems_list()
+		subsystem_count = length(subsystems)
+	for (var/subsystem_index in 1 to subsystem_count)
+		var/thing
+		try
+			thing = subsystems[subsystem_index]
+		catch
+			continue
 		var/datum/controller/subsystem/SS = thing
+		if(!istype(SS))
+			continue
 		if (SS.flags & SS_NO_FIRE)
 			continue
 		SS.queued_time = 0
@@ -313,7 +382,10 @@ GLOBAL_REAL(Master, /datum/controller/master)
 		SS.queue_prev = null
 		SS.state = SS_IDLE
 		if (SS.flags & SS_TICKER)
-			tickersubsystems += SS
+			try
+				tickersubsystems += SS
+			catch
+				tickersubsystems = list(SS)
 			// Timer subsystems aren't allowed to bunch up, so we offset them a bit
 			timer += world.tick_lag * rand(0, 1)
 			SS.next_fire = timer
@@ -321,11 +393,26 @@ GLOBAL_REAL(Master, /datum/controller/master)
 
 		var/ss_runlevels = SS.runlevels
 		var/added_to_any = FALSE
-		for(var/I in 1 to GLOB.bitflags.len)
-			if(ss_runlevels & GLOB.bitflags[I])
-				while(runlevel_sorted_subsystems.len < I)
+		var/bitflag_count = 0
+		try
+			bitflag_count = length(GLOB.bitflags)
+		catch
+			bitflag_count = 0
+		for(var/I in 1 to bitflag_count)
+			var/bitflag
+			try
+				bitflag = GLOB.bitflags[I]
+			catch
+				continue
+			if(ss_runlevels & bitflag)
+				while(length(runlevel_sorted_subsystems) < I)
 					runlevel_sorted_subsystems += list(list())
-				runlevel_sorted_subsystems[I] |= SS
+				var/list/runlevel_list = runlevel_sorted_subsystems[I]
+				try
+					if(!(SS in runlevel_list))
+						runlevel_list += SS
+				catch
+					runlevel_sorted_subsystems[I] = list(SS)
 				added_to_any = TRUE
 		if(!added_to_any)
 			WARNING("[SS.name] subsystem is not SS_NO_FIRE but also does not have any runlevels set!")
@@ -335,12 +422,28 @@ GLOBAL_REAL(Master, /datum/controller/master)
 	//these sort by lower priorities first to reduce the number of loops needed to add subsequent SS's to the queue
 	//(higher subsystems will be sooner in the queue, adding them later in the loop means we don't have to loop thru them next queue add)
 	sortTim(tickersubsystems, GLOBAL_PROC_REF(cmp_subsystem_priority))
-	for(var/I in runlevel_sorted_subsystems)
-		sortTim(I, GLOBAL_PROC_REF(cmp_subsystem_priority)) //I is a list, sort it bro
-		I += tickersubsystems
+	var/runlevel_list_count = length(runlevel_sorted_subsystems)
+	for(var/runlevel_index in 1 to runlevel_list_count)
+		var/list/runlevel_subsystems
+		try
+			runlevel_subsystems = runlevel_sorted_subsystems[runlevel_index]
+		catch
+			continue
+		if(!islist(runlevel_subsystems))
+			runlevel_subsystems = list()
+			runlevel_sorted_subsystems[runlevel_index] = runlevel_subsystems
+		sortTim(runlevel_subsystems, GLOBAL_PROC_REF(cmp_subsystem_priority))
+		try
+			runlevel_subsystems += tickersubsystems
+		catch
+			runlevel_sorted_subsystems[runlevel_index] = tickersubsystems.Copy()
 
 	var/cached_runlevel = current_runlevel
-	var/list/current_runlevel_subsystems = runlevel_sorted_subsystems[cached_runlevel]
+	var/list/current_runlevel_subsystems
+	try
+		current_runlevel_subsystems = runlevel_sorted_subsystems[cached_runlevel]
+	catch
+		current_runlevel_subsystems = list()
 
 	init_timeofday = REALTIMEOFDAY
 	init_time = world.time
@@ -398,12 +501,32 @@ GLOBAL_REAL(Master, /datum/controller/master)
 				//resechedule subsystems
 				var/list/old_subsystems = current_runlevel_subsystems
 				cached_runlevel = checking_runlevel
-				current_runlevel_subsystems = runlevel_sorted_subsystems[cached_runlevel]
+				try
+					current_runlevel_subsystems = runlevel_sorted_subsystems[cached_runlevel]
+				catch
+					current_runlevel_subsystems = list()
 
 				//now we'll go through all the subsystems we want to offset and give them a next_fire
-				for(var/datum/controller/subsystem/SS as anything in current_runlevel_subsystems)
+				var/current_runlevel_subsystem_count = 0
+				try
+					current_runlevel_subsystem_count = length(current_runlevel_subsystems)
+				catch
+					current_runlevel_subsystems = list()
+				for(var/current_runlevel_index in 1 to current_runlevel_subsystem_count)
+					var/datum/controller/subsystem/SS
+					try
+						SS = current_runlevel_subsystems[current_runlevel_index]
+					catch
+						continue
+					if(!istype(SS))
+						continue
 					//we only want to offset it if it's new and also behind
-					if(SS.next_fire > world.time || (SS in old_subsystems))
+					var/was_in_old_subsystems = FALSE
+					try
+						was_in_old_subsystems = (SS in old_subsystems)
+					catch
+						was_in_old_subsystems = FALSE
+					if(SS.next_fire > world.time || was_in_old_subsystems)
 						continue
 					SS.next_fire = world.time + world.tick_lag * rand(0, DS2TICKS(min(SS.wait, 2 SECONDS)))
 
@@ -457,10 +580,18 @@ GLOBAL_REAL(Master, /datum/controller/master)
 	var/datum/controller/subsystem/SS
 	var/SS_flags
 
-	for (var/thing in subsystemstocheck)
-		if (!thing)
-			subsystemstocheck -= thing
-		SS = thing
+	var/subsystems_to_check_count = 0
+	try
+		subsystems_to_check_count = length(subsystemstocheck)
+	catch
+		return FALSE
+	for (var/check_index in 1 to subsystems_to_check_count)
+		try
+			SS = subsystemstocheck[check_index]
+		catch
+			continue
+		if(!istype(SS))
+			continue
 		if (SS.state != SS_IDLE)
 			continue
 		if (SS.can_fire <= 0)
@@ -469,7 +600,6 @@ GLOBAL_REAL(Master, /datum/controller/master)
 			continue
 		SS_flags = SS.flags
 		if (SS_flags & SS_NO_FIRE)
-			subsystemstocheck -= SS
 			continue
 		if ((SS_flags & (SS_TICKER|SS_KEEP_TIMING)) == SS_KEEP_TIMING && SS.last_fire + (SS.wait * 0.75) > world.time)
 			continue
@@ -607,18 +737,50 @@ GLOBAL_REAL(Master, /datum/controller/master)
 	if (!istype(subsystems) || !istype(ticker_SS) || !istype(runlevel_SS))
 		log_world("MC: SoftReset: Bad list contents: '[subsystems]' '[ticker_SS]' '[runlevel_SS]'")
 		return
-	var/subsystemstocheck = subsystems + ticker_SS
-	for(var/I in runlevel_SS)
-		subsystemstocheck |= I
+	var/list/subsystemstocheck = list()
+	var/list/source_lists = list(subsystems, ticker_SS)
+	var/runlevel_count = 0
+	try
+		runlevel_count = length(runlevel_SS)
+	catch
+		runlevel_count = 0
+	for(var/runlevel_index in 1 to runlevel_count)
+		var/list/runlevel_entry
+		try
+			runlevel_entry = runlevel_SS[runlevel_index]
+		catch
+			continue
+		if(islist(runlevel_entry))
+			source_lists += list(runlevel_entry)
+	for(var/list/source_list as anything in source_lists)
+		var/source_count = 0
+		try
+			source_count = length(source_list)
+		catch
+			continue
+		for(var/source_index in 1 to source_count)
+			var/source_entry
+			try
+				source_entry = source_list[source_index]
+			catch
+				continue
+			if(!(source_entry in subsystemstocheck))
+				subsystemstocheck += source_entry
 
-	for (var/thing in subsystemstocheck)
-		var/datum/controller/subsystem/SS = thing
+	var/subsystemstocheck_count = length(subsystemstocheck)
+	for (var/check_index in 1 to subsystemstocheck_count)
+		var/datum/controller/subsystem/SS = subsystemstocheck[check_index]
 		if (!SS || !istype(SS))
 			//list(SS) is so if a list makes it in the subsystem list, we remove the list, not the contents
-			subsystems -= list(SS)
-			ticker_SS -= list(SS)
-			for(var/I in runlevel_SS)
-				I -= list(SS)
+			try
+				subsystems -= list(SS)
+				ticker_SS -= list(SS)
+				var/runlevel_remove_count = length(runlevel_SS)
+				for(var/runlevel_remove_index in 1 to runlevel_remove_count)
+					var/list/runlevel_remove_list = runlevel_SS[runlevel_remove_index]
+					runlevel_remove_list -= list(SS)
+			catch
+				EMPTY_BLOCK_GUARD
 			log_world("MC: SoftReset: Found bad entry in subsystem list, '[SS]'")
 			continue
 		if (SS.queue_next && !istype(SS.queue_next))
@@ -641,8 +803,19 @@ GLOBAL_REAL(Master, /datum/controller/master)
 	log_world("MC: SoftReset: Finished.")
 	. = 1
 
-	for(var/datum/controller/subsystem/ss in subsystems) //this is incase a runlevel error occurs, we don't want random shit being left queued up since if a queue ends up half parsed.
-		ss.state = SS_IDLE
+	var/subsystem_count = 0
+	try
+		subsystem_count = length(subsystems)
+	catch
+		subsystem_count = 0
+	for(var/subsystem_index in 1 to subsystem_count) //this is incase a runlevel error occurs, we don't want random shit being left queued up since if a queue ends up half parsed.
+		var/datum/controller/subsystem/ss
+		try
+			ss = subsystems[subsystem_index]
+		catch
+			continue
+		if(istype(ss))
+			ss.state = SS_IDLE
 
 /datum/controller/master/stat_entry(msg)
 	msg = "(TickRate:[Master.processing]) (Iteration:[Master.iteration]) (TickLimit: [round(Master.current_ticklimit, 0.1)])"
@@ -652,26 +825,65 @@ GLOBAL_REAL(Master, /datum/controller/master)
 	//disallow more than one map to load at once, multithreading it will just cause race conditions
 	while(map_loading)
 		stoplag()
-	for(var/datum/controller/subsystem/SS as anything in subsystems)
+	var/subsystem_count = 0
+	try
+		subsystem_count = length(subsystems)
+	catch
+		return
+	for(var/subsystem_index in 1 to subsystem_count)
+		var/datum/controller/subsystem/SS
+		try
+			SS = subsystems[subsystem_index]
+		catch
+			continue
+		if(!istype(SS))
+			continue
 		SS.StartLoadingMap()
 	map_loading = TRUE
 
 /datum/controller/master/StopLoadingMap(bounds = null)
 	map_loading = FALSE
-	for(var/datum/controller/subsystem/SS as anything in subsystems)
+	var/subsystem_count = 0
+	try
+		subsystem_count = length(subsystems)
+	catch
+		return
+	for(var/subsystem_index in 1 to subsystem_count)
+		var/datum/controller/subsystem/SS
+		try
+			SS = subsystems[subsystem_index]
+		catch
+			continue
+		if(!istype(SS))
+			continue
 		SS.StopLoadingMap()
 
 
 /datum/controller/master/proc/UpdateTickRate()
 	if (!processing)
 		return
-	var/client_count = length(GLOB.clients)
+	var/client_count = 0
+	try
+		client_count = length(GLOB.clients)
+	catch
+		GLOB.clients = list()
 	if (client_count < CONFIG_GET(number/mc_tick_rate/disable_high_pop_mc_mode_amount))
 		processing = CONFIG_GET(number/mc_tick_rate/base_mc_tick_rate)
 	else if (client_count > CONFIG_GET(number/mc_tick_rate/high_pop_mc_mode_amount))
 		processing = CONFIG_GET(number/mc_tick_rate/high_pop_mc_tick_rate)
 
 /datum/controller/master/proc/OnConfigLoad()
-	for (var/thing in subsystems)
-		var/datum/controller/subsystem/SS = thing
+	var/subsystem_count = 0
+	try
+		subsystem_count = length(subsystems)
+	catch
+		return
+	for (var/subsystem_index in 1 to subsystem_count)
+		var/datum/controller/subsystem/SS
+		try
+			SS = subsystems[subsystem_index]
+		catch
+			continue
+		if(!istype(SS))
+			continue
 		SS.OnConfigLoad()

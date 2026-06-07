@@ -26,79 +26,182 @@
 /mob/Login()
 	if(QDELETED(src) || QDELETED(client))
 		return
-	GLOB.player_list |= src
+	try
+		if(!islist(GLOB.player_list))
+			GLOB.player_list = list()
+		if(!(src in GLOB.player_list))
+			GLOB.player_list += src
+	catch
+		GLOB.player_list = list(src)
 	lastKnownIP	= client.address
 	computer_id	= client.computer_id
 	log_access("Mob Login: [key_name(src)] was assigned to a [type]")
-	world.update_status()
+	try
+		world.update_status()
+	catch
+		EMPTY_BLOCK_GUARD
 	client.screen = list()				//remove hud items just in case
 	client.images = list()
 
 	if(!hud_used)
 		create_mob_hud()
 	if(hud_used && client && client.prefs)
-		hud_used.show_hud(hud_used.hud_version)
-		hud_used.update_ui_style(ui_style2icon(client.prefs.UI_style))
+		try
+			hud_used.show_hud(hud_used.hud_version)
+			hud_used.update_ui_style(ui_style2icon(client.prefs.UI_style))
+		catch
+			EMPTY_BLOCK_GUARD
 
 	next_move = 1
 
 	..()
-	SEND_SIGNAL(src, COMSIG_MOB_LOGIN)
+	try
+		SEND_SIGNAL(src, COMSIG_MOB_LOGIN)
+	catch
+		EMPTY_BLOCK_GUARD
 
 	if (client && key != client.key)
 		key = client.key
-	reset_perspective(loc)
+	try
+		reset_perspective(loc)
+	catch
+		EMPTY_BLOCK_GUARD
 
 	if(loc)
-		loc.on_log(TRUE)
+		try
+			loc.on_log(TRUE)
+		catch
+			EMPTY_BLOCK_GUARD
 
 	//readd this mob's HUDs (antag, med, etc)
-	reload_huds()
+	try
+		reload_huds()
+	catch
+		EMPTY_BLOCK_GUARD
 
-	reload_fullscreen() // Reload any fullscreen overlays this mob has.
+	try
+		reload_fullscreen() // Reload any fullscreen overlays this mob has.
+	catch
+		EMPTY_BLOCK_GUARD
 
-	add_click_catcher()
+	try
+		add_click_catcher()
+	catch
+		EMPTY_BLOCK_GUARD
 
-	sync_mind()
+	try
+		sync_mind()
+	catch
+		EMPTY_BLOCK_GUARD
 
 	//Reload alternate appearances
-	for(var/v in GLOB.active_alternate_appearances)
-		if(!v)
-			continue
-		var/datum/atom_hud/alternate_appearance/AA = v
-		AA.onNewMob(src)
+	if(islist(GLOB.active_alternate_appearances))
+		var/appearance_count = 0
+		try
+			appearance_count = length(GLOB.active_alternate_appearances)
+		catch
+			appearance_count = 0
+		for(var/appearance_index in 1 to appearance_count)
+			var/datum/atom_hud/alternate_appearance/AA
+			try
+				AA = GLOB.active_alternate_appearances[appearance_index]
+				AA?.onNewMob(src)
+			catch
+				continue
 
-	update_client_colour()
-	update_mouse_pointer()
-	update_ambience_area(get_area(src))
+	try
+		update_client_colour()
+	catch
+		EMPTY_BLOCK_GUARD
+	try
+		update_mouse_pointer()
+	catch
+		EMPTY_BLOCK_GUARD
+	try
+		update_ambience_area(get_area(src))
+	catch
+		EMPTY_BLOCK_GUARD
 
 	if(!can_hear())
 		stop_sound_channel(CHANNEL_AMBIENCE)
 
 	if(client)
-		if(client.player_details.player_actions.len)
-			for(var/datum/action/A in client.player_details.player_actions)
-				A.Grant(src)
+		var/list/player_actions = null
+		var/list/post_login_callbacks = null
+		try
+			player_actions = client.player_details?.player_actions
+			post_login_callbacks = client.player_details?.post_login_callbacks
+		catch
+			player_actions = null
+			post_login_callbacks = null
+		if(islist(player_actions))
+			var/action_count = 0
+			try
+				action_count = length(player_actions)
+			catch
+				action_count = 0
+			for(var/action_index in 1 to action_count)
+				var/datum/action/A
+				try
+					A = player_actions[action_index]
+					A?.Grant(src)
+				catch
+					continue
 
-		for(var/datum/callback/CB as anything in client.player_details.post_login_callbacks)
-			CB.Invoke()
-		log_played_names(client.ckey,name,real_name)
-		auto_deadmin_on_login()
+		if(islist(post_login_callbacks))
+			var/callback_count = 0
+			try
+				callback_count = length(post_login_callbacks)
+			catch
+				callback_count = 0
+			for(var/callback_index in 1 to callback_count)
+				var/datum/callback/CB
+				try
+					CB = post_login_callbacks[callback_index]
+					CB?.Invoke()
+				catch
+					continue
+		try
+			log_played_names(client.ckey,name,real_name)
+		catch
+			EMPTY_BLOCK_GUARD
+		try
+			auto_deadmin_on_login()
+		catch
+			EMPTY_BLOCK_GUARD
 
 	if(SSticker.current_state == GAME_STATE_FINISHED)
 		do_game_over()
 
 	log_message("Client [key_name(src)] has taken ownership of mob [src]([src.type])", LOG_OWNERSHIP)
-	enable_client_mobs_in_contents(client)
+	try
+		enable_client_mobs_in_contents(client)
+	catch
+		EMPTY_BLOCK_GUARD
 
-	SEND_SIGNAL(src, COMSIG_MOB_CLIENT_LOGIN, client)
+	try
+		SEND_SIGNAL(src, COMSIG_MOB_CLIENT_LOGIN, client)
+	catch
+		EMPTY_BLOCK_GUARD
 
-	client.init_verbs()
+	try
+		client.init_verbs()
+	catch
+		EMPTY_BLOCK_GUARD
 
-	addtimer(CALLBACK(src, PROC_REF(send_pref_messages)), 2 SECONDS)
-	resend_all_uis()
+	try
+		addtimer(CALLBACK(src, PROC_REF(send_pref_messages)), 2 SECONDS)
+	catch
+		EMPTY_BLOCK_GUARD
+	try
+		resend_all_uis()
+	catch
+		EMPTY_BLOCK_GUARD
 	if(client)
-		client.preload_music()
+		try
+			client.preload_music()
+		catch
+			EMPTY_BLOCK_GUARD
 
 /mob/proc/send_pref_messages()
 	if(client?.prefs)

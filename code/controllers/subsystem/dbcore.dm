@@ -30,7 +30,21 @@ SUBSYSTEM_DEF(dbcore)
 	return ..()
 
 /datum/controller/subsystem/dbcore/fire()
-	for(var/datum/DBQuery/Q as anything in active_queries)
+	if(!islist(active_queries))
+		active_queries = list()
+	var/query_count = 0
+	try
+		query_count = length(active_queries)
+	catch
+		active_queries = list()
+	for(var/query_index in 1 to query_count)
+		var/datum/DBQuery/Q
+		try
+			Q = active_queries[query_index]
+		catch
+			continue
+		if(!Q)
+			continue
 		if(world.time - Q.last_activity_time > (5 MINUTES))
 			message_admins("Found undeleted query, please check the server logs and notify coders.")
 			log_sql("Undeleted query: \"[Q.sql]\" LA: [Q.last_activity] LAT: [Q.last_activity_time]")
@@ -371,7 +385,13 @@ Delayed insert mode was removed in mysql 7 and only works with MyISAM type table
 	var/list/item  //list of data values populated by NextRow()
 
 /datum/DBQuery/New(connection, sql, arguments)
-	SSdbcore.active_queries[src] = TRUE
+	try
+		if(!islist(SSdbcore.active_queries))
+			SSdbcore.active_queries = list()
+		SSdbcore.active_queries[src] = TRUE
+	catch
+		SSdbcore.active_queries = list()
+		SSdbcore.active_queries[src] = TRUE
 	Activity("Created")
 	item = list()
 
@@ -380,8 +400,15 @@ Delayed insert mode was removed in mysql 7 and only works with MyISAM type table
 	src.arguments = arguments
 
 /datum/DBQuery/Destroy()
-	Close()
-	SSdbcore.active_queries -= src
+	try
+		Close()
+	catch
+		EMPTY_BLOCK_GUARD
+	try
+		if(islist(SSdbcore.active_queries))
+			SSdbcore.active_queries -= src
+	catch
+		SSdbcore.active_queries = list()
 	return ..()
 
 /datum/DBQuery/CanProcCall(proc_name)

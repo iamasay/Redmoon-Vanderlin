@@ -11,17 +11,44 @@ SUBSYSTEM_DEF(asset_loading)
 	var/last_queue_len = 0
 
 /datum/controller/subsystem/asset_loading/fire(resumed)
-	while(length(generate_queue))
-		var/datum/asset/to_load = generate_queue[generate_queue.len]
+	if(!islist(generate_queue))
+		generate_queue = list()
+	while(TRUE)
+		var/queue_length = 0
+		try
+			queue_length = length(generate_queue)
+		catch
+			generate_queue = list()
+			break
+		if(!queue_length)
+			break
+		var/datum/asset/to_load
+		try
+			to_load = generate_queue[queue_length]
+		catch
+			generate_queue = list()
+			break
 
-		to_load.queued_generation()
+		try
+			to_load?.queued_generation()
+		catch
+			EMPTY_BLOCK_GUARD
 
 		if(MC_TICK_CHECK)
 			return
-		last_queue_len = length(generate_queue)
-		generate_queue.len--
+		try
+			last_queue_len = length(generate_queue)
+			generate_queue.len--
+		catch
+			generate_queue = list()
+			break
 	// We just emptied the queue
-	if(last_queue_len && !length(generate_queue))
+	var/queue_empty = FALSE
+	try
+		queue_empty = !length(generate_queue)
+	catch
+		queue_empty = TRUE
+	if(last_queue_len && queue_empty)
 		// Clean up cached icons, freeing memory.
 		rustg_iconforge_cleanup()
 
@@ -29,7 +56,17 @@ SUBSYSTEM_DEF(asset_loading)
 #ifdef DO_NOT_DEFER_ASSETS
 	stack_trace("We queued an instance of [queue.type] for lateloading despite not allowing it")
 #endif
-	generate_queue += queue
+	if(!islist(generate_queue))
+		generate_queue = list()
+	try
+		if(!(queue in generate_queue))
+			generate_queue += queue
+	catch
+		generate_queue = list(queue)
 
 /datum/controller/subsystem/asset_loading/proc/dequeue_asset(datum/asset/queue)
-	generate_queue -= queue
+	try
+		if(islist(generate_queue))
+			generate_queue -= queue
+	catch
+		generate_queue = list()

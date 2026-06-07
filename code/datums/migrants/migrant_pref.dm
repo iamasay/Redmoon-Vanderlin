@@ -18,7 +18,12 @@
 	if((new_state == TRUE) && SSmigrants.admin_disabled)
 		to_chat(prefs.parent, span_boldwarning("Migration is disabled!"))
 		return
-	role_preferences.Cut()
+	try
+		if(!islist(role_preferences))
+			role_preferences = list()
+		role_preferences.Cut()
+	catch
+		role_preferences = list()
 	active = new_state
 	if(!silent && prefs.parent)
 		if(new_state)
@@ -29,10 +34,15 @@
 /datum/migrant_pref/proc/toggle_role_preference(role_type)
 	if(!active)
 		set_active(TRUE)
+	if(!islist(role_preferences))
+		role_preferences = list()
 	if(role_type in role_preferences)
 		role_preferences -= role_type
 		return
-	role_preferences.Cut()
+	try
+		role_preferences.Cut()
+	catch
+		role_preferences = list()
 	if(SSmigrants.can_be_role(prefs.parent, role_type))
 		role_preferences += role_type
 		var/datum/migrant_role/role = MIGRANT_ROLE(role_type)
@@ -54,7 +64,11 @@
 		main_dat += "<center> <h1> <b style='color:red;'> Migration has been disabled by an admin! </b>  </h1> </center>"
 		return main_dat
 
-	var/player_triumph = SStriumphs.get_triumphs(client.ckey)
+	var/player_triumph = 0
+	try
+		player_triumph = SStriumphs.get_triumphs(client.ckey)
+	catch
+		player_triumph = 0
 
 	// Build main content (left side)
 	main_dat += "<div style='padding: 10px;'>"
@@ -71,15 +85,31 @@
 
 		// Show if this wave was triumph-influenced
 		if(wave.triumph_total > 0)
-			var/player_contribution = wave.triumph_contributions[client.ckey] ? wave.triumph_contributions[client.ckey] : 0
+			var/player_contribution = 0
+			try
+				player_contribution = islist(wave.triumph_contributions) && wave.triumph_contributions[client.ckey] ? wave.triumph_contributions[client.ckey] : 0
+			catch
+				player_contribution = 0
 			if(player_contribution > 0)
 				main_dat += "<div style='text-align: center; color: cyan; margin-bottom: 10px;'>You influenced this wave! ([player_contribution] triumph)</div>"
 			else
 				main_dat += "<div style='text-align: center; color: yellow; margin-bottom: 10px;'>This wave was influenced by triumph!</div>"
 
-		for(var/role_type in wave.roles)
-			var/datum/migrant_role/role = MIGRANT_ROLE(role_type)
-			var/role_amount = wave.roles[role_type]
+		var/role_count = 0
+		try
+			role_count = islist(wave.roles) ? length(wave.roles) : 0
+		catch
+			role_count = 0
+		for(var/role_index in 1 to role_count)
+			var/role_type
+			var/datum/migrant_role/role
+			var/role_amount = 0
+			try
+				role_type = wave.roles[role_index]
+				role = MIGRANT_ROLE(role_type)
+				role_amount = wave.roles[role_type]
+			catch
+				continue
 			var/role_name = role.name
 			if(active  && (role_type in role_preferences))
 				role_name = "<u><b>[role_name]</b></u>"
@@ -107,19 +137,47 @@
 	// Calculate total weights for percentage calculation
 	var/list/wave_weights = list()
 	var/total_weight = 0
-	var/list/available_waves = SSmigrants.get_influenceable_waves()
+	var/list/available_waves = list()
+	try
+		available_waves = SSmigrants.get_influenceable_waves()
+		if(!islist(available_waves))
+			available_waves = list()
+	catch
+		available_waves = list()
 
-	for(var/wave_type in available_waves)
-		var/datum/migrant_wave/wave = MIGRANT_WAVE(wave_type)
-		var/weight = SSmigrants.calculate_triumph_weight(wave)
+	var/available_wave_count = 0
+	try
+		available_wave_count = length(available_waves)
+	catch
+		available_wave_count = 0
+	for(var/wave_index in 1 to available_wave_count)
+		var/wave_type
+		var/datum/migrant_wave/wave
+		var/weight = 0
+		try
+			wave_type = available_waves[wave_index]
+			wave = MIGRANT_WAVE(wave_type)
+			weight = SSmigrants.calculate_triumph_weight(wave)
+		catch
+			continue
 		wave_weights[wave_type] = weight
 		total_weight += weight
 
-	for(var/wave_type in available_waves)
-		var/datum/migrant_wave/wave = MIGRANT_WAVE(wave_type)
+	for(var/wave_index in 1 to available_wave_count)
+		var/wave_type
+		var/datum/migrant_wave/wave
+		try
+			wave_type = available_waves[wave_index]
+			wave = MIGRANT_WAVE(wave_type)
+		catch
+			continue
 		var/triumph_display = "[wave.triumph_total]/[wave.triumph_threshold]"
 		var/threshold_reached = wave.triumph_total >= wave.triumph_threshold
-		var/player_contribution = wave.triumph_contributions[client.ckey] ? wave.triumph_contributions[client.ckey] : 0
+		var/player_contribution = 0
+		try
+			player_contribution = islist(wave.triumph_contributions) && wave.triumph_contributions[client.ckey] ? wave.triumph_contributions[client.ckey] : 0
+		catch
+			player_contribution = 0
 
 		// Check if wave has hit max spawns
 		var/is_maxed_out = FALSE
@@ -127,7 +185,12 @@
 			var/used_wave_type = wave.type
 			if(wave.shared_wave_type)
 				used_wave_type = wave.shared_wave_type
-			if(SSmigrants.spawned_waves[used_wave_type] && SSmigrants.spawned_waves[used_wave_type] >= wave.max_spawns)
+			var/spawned_count = 0
+			try
+				spawned_count = islist(SSmigrants.spawned_waves) ? (SSmigrants.spawned_waves[used_wave_type] || 0) : 0
+			catch
+				spawned_count = 0
+			if(spawned_count >= wave.max_spawns)
 				is_maxed_out = TRUE
 
 		var/wave_color = "#ffffff"

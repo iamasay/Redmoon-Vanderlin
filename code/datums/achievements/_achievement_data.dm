@@ -28,8 +28,20 @@
 	// Serialize the data list: keys are typepaths (stringified), values are the achievement state.
 	// We store the entire achievement data blob as a single key for simplicity.
 	var/list/serialized = list()
-	for(var/T in data)
-		serialized["[T]"] = data[T]
+	if(!islist(data))
+		data = list()
+	var/data_count = 0
+	try
+		data_count = length(data)
+	catch
+		data = list()
+	for(var/data_index in 1 to data_count)
+		var/T
+		try
+			T = data[data_index]
+			serialized["[T]"] = data[T]
+		catch
+			continue
 
 	return SM.set_data(save_file_name, "achievement_data", serialized)
 
@@ -43,18 +55,45 @@
 		if(!islist(saved))
 			saved = list()
 
-	for(var/T in subtypesof(/datum/award))
-		var/datum/award/A = SSachievements.awards[T]
+	if(!islist(data))
+		data = list()
+	if(!islist(original_cached_data))
+		original_cached_data = list()
+	var/list/award_types = subtypesof(/datum/award)
+	var/award_type_count = 0
+	try
+		award_type_count = length(award_types)
+	catch
+		award_type_count = 0
+	for(var/award_type_index in 1 to award_type_count)
+		var/T
+		var/datum/award/A
+		try
+			T = award_types[award_type_index]
+			A = SSachievements.awards[T]
+		catch
+			continue
 		if(!A || !A.name) // Skip abstract types
 			continue
 
 		var/text_key ="[T]"
-		if(text_key in saved)
-			data[T] = A.parse_value(saved[text_key])
-		else
-			data[T] = A.default_value
+		var/loaded_value = A.default_value
+		try
+			if(islist(saved) && (text_key in saved))
+				loaded_value = A.parse_value(saved[text_key])
+		catch
+			loaded_value = A.default_value
+		try
+			data[T] = loaded_value
+		catch
+			data = list()
+			data[T] = loaded_value
 
-		original_cached_data[T] = data[T]
+		try
+			original_cached_data[T] = data[T]
+		catch
+			original_cached_data = list()
+			original_cached_data[T] = data[T]
 
 /// Ensures a specific achievement's data is loaded (lazy load fallback, now just checks local cache).
 /datum/achievement_data/proc/get_data(achievement_type)

@@ -362,7 +362,13 @@ SUBSYSTEM_DEF(timer)
 	timeToRun = (flags & TIMER_CLIENT_TIME ? REALTIMEOFDAY : world.time) + wait
 
 	if (flags & TIMER_UNIQUE)
-		SStimer.hashes[hash] = src
+		try
+			if(!islist(SStimer.hashes))
+				SStimer.hashes = list()
+			SStimer.hashes[hash] = src
+		catch
+			SStimer.hashes = list()
+			SStimer.hashes[hash] = src
 
 	if (flags & TIMER_STOPPABLE)
 		id = num2text(nextid, 100)
@@ -370,7 +376,13 @@ SUBSYSTEM_DEF(timer)
 			nextid += min(1, 2**round(nextid/SHORT_REAL_LIMIT))
 		else
 			nextid++
-		SStimer.timer_id_dict[id] = src
+		try
+			if(!islist(SStimer.timer_id_dict))
+				SStimer.timer_id_dict = list()
+			SStimer.timer_id_dict[id] = src
+		catch
+			SStimer.timer_id_dict = list()
+			SStimer.timer_id_dict[id] = src
 
 	if ((timeToRun < world.time || timeToRun < SStimer.head_offset) && !(flags & TIMER_CLIENT_TIME))
 		CRASH("Invalid timer state: Timer created that would require a backtrack to run (addtimer would never let this happen): [SStimer.get_timer_debug_string(src)]")
@@ -383,7 +395,11 @@ SUBSYSTEM_DEF(timer)
 /datum/timedevent/Destroy()
 	..()
 	if (flags & TIMER_UNIQUE && hash)
-		SStimer.hashes -= hash
+		try
+			if(islist(SStimer.hashes))
+				SStimer.hashes -= hash
+		catch
+			SStimer.hashes = list()
 
 	if (callBack && callBack.object && callBack.object != GLOBAL_PROC && callBack.object.active_timers)
 		callBack.object.active_timers -= src
@@ -392,12 +408,20 @@ SUBSYSTEM_DEF(timer)
 	callBack = null
 
 	if (flags & TIMER_STOPPABLE)
-		SStimer.timer_id_dict -= id
+		try
+			if(islist(SStimer.timer_id_dict))
+				SStimer.timer_id_dict -= id
+		catch
+			SStimer.timer_id_dict = list()
 
 	if (flags & TIMER_CLIENT_TIME)
 		if (!spent)
 			spent = world.time
-			SStimer.clienttime_timers -= src
+			try
+				if(islist(SStimer.clienttime_timers))
+					SStimer.clienttime_timers -= src
+			catch
+				SStimer.clienttime_timers = list()
 		return QDEL_HINT_IWILLGC
 
 	if (!spent)
@@ -415,21 +439,35 @@ SUBSYSTEM_DEF(timer)
 /datum/timedevent/proc/bucketEject()
 	// Store local references for the bucket list and secondary queue
 	// This is faster than referencing them from the datum itself
-	var/list/bucket_list = SStimer.bucket_list
-	var/list/second_queue = SStimer.second_queue
+	var/list/bucket_list = islist(SStimer.bucket_list) ? SStimer.bucket_list : list()
+	var/list/second_queue = islist(SStimer.second_queue) ? SStimer.second_queue : list()
+	if(!islist(SStimer.bucket_list))
+		SStimer.bucket_list = bucket_list
+	if(!islist(SStimer.second_queue))
+		SStimer.second_queue = second_queue
 	var/datum/timedevent/buckethead
 	if(bucket_pos > 0)
-		buckethead = bucket_list[bucket_pos]
+		try
+			buckethead = bucket_list[bucket_pos]
+		catch
+			buckethead = null
 	if(buckethead == src)
-		bucket_list[bucket_pos] = next
+		try
+			bucket_list[bucket_pos] = next
+		catch
+			EMPTY_BLOCK_GUARD
 		SStimer.bucket_count--
 	else if(bucket_joined)
 		SStimer.bucket_count--
 	else
-		var/l = length(second_queue)
-		second_queue -= src
-		if(l == length(second_queue))
-			SStimer.bucket_count--
+		var/l = 0
+		try
+			l = length(second_queue)
+			second_queue -= src
+			if(l == length(second_queue))
+				SStimer.bucket_count--
+		catch
+			SStimer.second_queue = list()
 	if(prev && prev.next == src)
 		prev.next = next
 	if (next && next.prev == src)
@@ -462,15 +500,40 @@ SUBSYSTEM_DEF(timer)
 	else if (timeToRun >= TIMER_MAX)
 		L = SStimer.second_queue
 
+	if(L && !islist(L))
+		L = list()
+		if(flags & TIMER_CLIENT_TIME)
+			SStimer.clienttime_timers = L
+		else
+			SStimer.second_queue = L
+
 	if(L)
-		BINARY_INSERT(src, L, /datum/timedevent, src, timeToRun, COMPARE_KEY)
+		try
+			BINARY_INSERT(src, L, /datum/timedevent, src, timeToRun, COMPARE_KEY)
+		catch
+			try
+				L += src
+			catch
+				L = list(src)
+				if(flags & TIMER_CLIENT_TIME)
+					SStimer.clienttime_timers = L
+				else
+					SStimer.second_queue = L
 		return
 
 	//get the list of buckets
 	var/list/bucket_list = SStimer.bucket_list
+	if(!islist(bucket_list))
+		SStimer.reset_buckets()
+		bucket_list = SStimer.bucket_list
+	if(!islist(bucket_list))
+		return
 
 	//calculate our place in the bucket list
-	bucket_pos = BUCKET_POS(src)
+	try
+		bucket_pos = BUCKET_POS(src)
+	catch
+		return
 
 	if (bucket_pos < SStimer.practical_offset && timeToRun < (SStimer.head_offset + TICKS2DS(BUCKET_LEN)))
 		WARNING("Bucket pos in past: bucket_pos = [bucket_pos] < practical_offset = [SStimer.practical_offset] \
@@ -478,19 +541,29 @@ SUBSYSTEM_DEF(timer)
 		bucket_pos = SStimer.practical_offset // Recover bucket_pos to avoid timer blocking queue
 
 	//get the bucket for our tick
-	var/datum/timedevent/bucket_head = bucket_list[bucket_pos]
+	var/datum/timedevent/bucket_head
+	try
+		bucket_head = bucket_list[bucket_pos]
+	catch
+		return
 	SStimer.bucket_count++
 	//empty bucket, we will just add ourselves
 	if (!bucket_head)
 		bucket_joined = TRUE
-		bucket_list[bucket_pos] = src
+		try
+			bucket_list[bucket_pos] = src
+		catch
+			EMPTY_BLOCK_GUARD
 		return
 	// Otherwise, we merely add this timed event into the bucket, which is a doubly-linked list
 	bucket_joined = TRUE
 	bucket_head.prev = src
 	next = bucket_head
 	prev = null
-	bucket_list[bucket_pos] = src
+	try
+		bucket_list[bucket_pos] = src
+	catch
+		EMPTY_BLOCK_GUARD
 
 ///Returns a string of the type of the callback for this timer
 /datum/timedevent/proc/getcallingtype()
@@ -534,10 +607,20 @@ SUBSYSTEM_DEF(timer)
 		var/list/hashlist = list(callback.object, "([REF(callback.object)])", callback.delegate, flags & TIMER_CLIENT_TIME)
 		if(!(flags & TIMER_NO_HASH_WAIT))
 			hashlist += wait
-		hashlist += callback.arguments
+		try
+			hashlist += callback.arguments
+		catch
+			EMPTY_BLOCK_GUARD
 		hash = hashlist.Join("|||||||")
 
-		var/datum/timedevent/hash_timer = SStimer.hashes[hash]
+		if(!islist(SStimer.hashes))
+			SStimer.hashes = list()
+		var/datum/timedevent/hash_timer
+		try
+			hash_timer = SStimer.hashes[hash]
+		catch
+			SStimer.hashes = list()
+			hash_timer = null
 		if(hash_timer)
 			if (hash_timer.spent) // it's pending deletion, pretend it doesn't exist.
 				hash_timer.hash = null // but keep it from accidentally deleting us

@@ -7,11 +7,27 @@ GLOBAL_LIST_EMPTY(asset_datums)
 //get an assetdatum or make a new one
 //does NOT ensure it's filled, if you want that use get_asset_datum()
 /proc/load_asset_datum(type)
-	return GLOB.asset_datums[type] || new type()
+	try
+		if(!islist(GLOB.asset_datums))
+			GLOB.asset_datums = list()
+		return GLOB.asset_datums[type] || new type()
+	catch
+		GLOB.asset_datums = list()
+		return new type()
 
 /proc/get_asset_datum(type)
-	var/datum/asset/loaded_asset = GLOB.asset_datums[type] || new type()
-	return loaded_asset.ensure_ready()
+	var/datum/asset/loaded_asset
+	try
+		if(!islist(GLOB.asset_datums))
+			GLOB.asset_datums = list()
+		loaded_asset = GLOB.asset_datums[type] || new type()
+	catch
+		GLOB.asset_datums = list()
+		loaded_asset = new type()
+	try
+		return loaded_asset.ensure_ready()
+	catch
+		return loaded_asset
 
 /datum/asset
 	abstract_type = /datum/asset
@@ -28,8 +44,17 @@ GLOBAL_LIST_EMPTY(asset_datums)
 	var/cross_round_cachable = FALSE
 
 /datum/asset/New()
-	GLOB.asset_datums[type] = src
-	register()
+	try
+		if(!islist(GLOB.asset_datums))
+			GLOB.asset_datums = list()
+		GLOB.asset_datums[type] = src
+	catch
+		GLOB.asset_datums = list()
+		GLOB.asset_datums[type] = src
+	try
+		register()
+	catch
+		log_asset("ERROR: Failed to register asset [type]")
 
 /// Stub that allows us to react to something trying to get us
 /// Not useful here, more handy for sprite sheets
@@ -98,8 +123,21 @@ GLOBAL_LIST_EMPTY(asset_datums)
 	var/keep_local_name = FALSE
 
 /datum/asset/simple/register()
-	for(var/asset_name in assets)
-		var/datum/asset_cache_item/ACI = SSassets.transport.register_asset(asset_name, assets[asset_name])
+	if(!islist(assets))
+		assets = list()
+	var/asset_count = 0
+	try
+		asset_count = length(assets)
+	catch
+		assets = list()
+	for(var/asset_index in 1 to asset_count)
+		var/asset_name
+		var/datum/asset_cache_item/ACI
+		try
+			asset_name = assets[asset_index]
+			ACI = SSassets.transport.register_asset(asset_name, assets[asset_name])
+		catch
+			continue
 		if (!ACI)
 			log_asset("ERROR: Invalid asset: [type]:[asset_name]:[ACI]")
 			continue
@@ -107,19 +145,49 @@ GLOBAL_LIST_EMPTY(asset_datums)
 			ACI.legacy = TRUE
 		if (keep_local_name)
 			ACI.keep_local_name = keep_local_name
-		assets[asset_name] = ACI
+		try
+			assets[asset_name] = ACI
+		catch
+			continue
 
 /datum/asset/simple/send(client)
-	. = SSassets.transport.send_assets(client, assets)
+	try
+		. = SSassets.transport.send_assets(client, assets)
+	catch
+		. = FALSE
 
 /datum/asset/simple/get_url_mappings()
 	. = list()
-	for (var/asset_name in assets)
-		.[asset_name] = SSassets.transport.get_asset_url(asset_name, assets[asset_name])
+	if(!islist(assets))
+		return .
+	var/asset_count = 0
+	try
+		asset_count = length(assets)
+	catch
+		return .
+	for(var/asset_index in 1 to asset_count)
+		var/asset_name
+		try
+			asset_name = assets[asset_index]
+			.[asset_name] = SSassets.transport.get_asset_url(asset_name, assets[asset_name])
+		catch
+			continue
 
 /datum/asset/simple/unregister()
-	for (var/asset_name in assets)
-		SSassets.transport.unregister_asset(asset_name)
+	if(!islist(assets))
+		return
+	var/asset_count = 0
+	try
+		asset_count = length(assets)
+	catch
+		asset_count = 0
+	for(var/asset_index in 1 to asset_count)
+		var/asset_name
+		try
+			asset_name = assets[asset_index]
+			SSassets.transport.unregister_asset(asset_name)
+		catch
+			continue
 
 // If you use a file(...) object, instead of caching the asset it will be loaded from disk every time it's requested.
 // This is useful for development, but not recommended for production.
@@ -199,10 +267,28 @@ GLOBAL_LIST_EMPTY(asset_datums)
 		assets |= parents
 
 	var/list/hashlist = list()
-	sortTim(assets, GLOBAL_PROC_REF(cmp_text_asc))
+	if(!islist(assets))
+		assets = list()
+	if(!islist(parents))
+		parents = list()
+	try
+		sortTim(assets, GLOBAL_PROC_REF(cmp_text_asc))
+	catch
+		EMPTY_BLOCK_GUARD
 
-	for (var/asset_name in assets)
-		var/datum/asset_cache_item/ACI = new(asset_name, assets[asset_name])
+	var/asset_count = 0
+	try
+		asset_count = length(assets)
+	catch
+		asset_count = 0
+	for(var/asset_index in 1 to asset_count)
+		var/asset_name
+		var/datum/asset_cache_item/ACI
+		try
+			asset_name = assets[asset_index]
+			ACI = new(asset_name, assets[asset_name])
+		catch
+			continue
 		if (!ACI?.hash)
 			log_asset("ERROR: Invalid asset: [type]:[asset_name]:[ACI]")
 			continue
@@ -210,16 +296,38 @@ GLOBAL_LIST_EMPTY(asset_datums)
 		assets[asset_name] = ACI
 	var/namespace = md5(hashlist.Join())
 
-	for (var/asset_name in parents)
-		var/datum/asset_cache_item/ACI = new(asset_name, parents[asset_name])
+	var/parent_count = 0
+	try
+		parent_count = length(parents)
+	catch
+		parent_count = 0
+	for(var/parent_index in 1 to parent_count)
+		var/asset_name
+		var/datum/asset_cache_item/ACI
+		try
+			asset_name = parents[parent_index]
+			ACI = new(asset_name, parents[asset_name])
+		catch
+			continue
 		if (!ACI?.hash)
 			log_asset("ERROR: Invalid asset: [type]:[asset_name]:[ACI]")
 			continue
 		ACI.namespace_parent = TRUE
 		assets[asset_name] = ACI
 
-	for (var/asset_name in assets)
-		var/datum/asset_cache_item/ACI = assets[asset_name]
+	asset_count = 0
+	try
+		asset_count = length(assets)
+	catch
+		asset_count = 0
+	for(var/asset_index in 1 to asset_count)
+		var/asset_name
+		var/datum/asset_cache_item/ACI
+		try
+			asset_name = assets[asset_index]
+			ACI = assets[asset_name]
+		catch
+			continue
 		if (!ACI?.hash)
 			log_asset("ERROR: Invalid asset: [type]:[asset_name]:[ACI]")
 			continue
@@ -230,7 +338,10 @@ GLOBAL_LIST_EMPTY(asset_datums)
 /// Get a html string that will load a html asset.
 /// Needed because byond doesn't allow you to browse() to a url.
 /datum/asset/simple/namespaced/proc/get_htmlloader(filename)
-	return url2htmlloader(SSassets.transport.get_asset_url(filename, assets[filename]))
+	try
+		return url2htmlloader(SSassets.transport.get_asset_url(filename, assets[filename]))
+	catch
+		return url2htmlloader("[filename]")
 
 /// A subtype to generate a JSON file from a list
 /datum/asset/json

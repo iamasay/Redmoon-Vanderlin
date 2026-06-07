@@ -116,6 +116,8 @@ SUBSYSTEM_DEF(sounds)
  */
 /datum/controller/subsystem/sounds/proc/reserve_channel()
 	PRIVATE_PROC(TRUE)
+	if(!islist(channel_list) || !length(channel_list))
+		setup_available_channels()
 	if(channel_reserve_high <= random_channels_min)		// out of channels
 		return
 	var/channel = channel_list[channel_reserve_high]
@@ -127,10 +129,12 @@ SUBSYSTEM_DEF(sounds)
  */
 /datum/controller/subsystem/sounds/proc/free_channel(number)
 	PRIVATE_PROC(TRUE)
+	if(!islist(channel_list) || !islist(reserved_channels))
+		setup_available_channels()
 	var/text_channel = num2text(number)
 	var/index = reserved_channels[text_channel]
 	if(!index)
-		CRASH("Attempted to (internally) free a channel that wasn't reserved.")
+		return
 	reserved_channels -= text_channel
 	// push reserve index up, which makes it now on a channel that is reserved
 	channel_reserve_high++
@@ -145,15 +149,27 @@ SUBSYSTEM_DEF(sounds)
 
 /// Random available channel, returns text.
 /datum/controller/subsystem/sounds/proc/random_available_channel_text()
+	if(!islist(channel_list) || !length(channel_list))
+		setup_available_channels()
 	if(channel_random_low > channel_reserve_high)
 		channel_random_low = 1
-	. = "[channel_list[channel_random_low++]]"
+	try
+		. = "[channel_list[channel_random_low++]]"
+	catch
+		setup_available_channels()
+		. = "[channel_list[channel_random_low++]]"
 
 /// Random available channel, returns number
 /datum/controller/subsystem/sounds/proc/random_available_channel()
+	if(!islist(channel_list) || !length(channel_list))
+		setup_available_channels()
 	if(channel_random_low > channel_reserve_high)
 		channel_random_low = 1
-	. = channel_list[channel_random_low++]
+	try
+		. = channel_list[channel_random_low++]
+	catch
+		setup_available_channels()
+		. = channel_list[channel_random_low++]
 
 /// How many channels we have left.
 /datum/controller/subsystem/sounds/proc/available_channels_left()

@@ -12,7 +12,13 @@ SUBSYSTEM_DEF(movement)
 	var/visual_delay = 1
 
 /datum/controller/subsystem/movement/stat_entry(msg)
-	msg = "P:[length(processing)]"
+	var/processing_count = 0
+	if(islist(processing))
+		try
+			processing_count = length(processing)
+		catch
+			processing = list()
+	msg = "P:[processing_count]"
 	return ..()
 
 /datum/controller/subsystem/movement/Recover()
@@ -28,23 +34,61 @@ SUBSYSTEM_DEF(movement)
 /datum/controller/subsystem/movement/fire(resumed)
 	if(!resumed)
 		canonical_time = world.time
-		currentrun = processing.Copy()
+		if(!islist(processing))
+			processing = list()
+		try
+			currentrun = processing.Copy()
+		catch
+			processing = list()
+			currentrun = list()
 
 	var/list/running = currentrun //Cache for... you've heard this before
-	while(running.len)
-		var/datum/move_loop/loop = running[running.len]
-		running.len--
+	var/running_length = 0
+	try
+		running_length = length(running)
+	catch
+		currentrun = list()
+		return
+	while(running_length)
+		var/datum/move_loop/loop
+		try
+			loop = running[running_length]
+			running.len--
+		catch
+			currentrun = list()
+			return
+		running_length--
+		if(!istype(loop))
+			continue
 		if(loop.timer <= canonical_time)
-			loop.process() //This shouldn't get nulls, if it does, runtime
+			try
+				loop.process() //This shouldn't get nulls, if it does, runtime
+			catch
+				remove_loop(loop)
 		if (MC_TICK_CHECK)
 			return
 	visual_delay = MC_AVERAGE_FAST(visual_delay, max((world.time - canonical_time) / wait, 1))
 
 /datum/controller/subsystem/movement/proc/add_loop(datum/move_loop/add)
-	processing += add
+	if(!istype(add))
+		return
+	if(!islist(processing))
+		processing = list()
+	try
+		processing += add
+	catch
+		processing = list(add)
 	add.start_loop()
 
 /datum/controller/subsystem/movement/proc/remove_loop(datum/move_loop/remove)
-	processing -= remove
-	currentrun -= remove
+	try
+		if(islist(processing))
+			processing -= remove
+	catch
+		processing = list()
+	try
+		if(islist(currentrun))
+			currentrun -= remove
+	catch
+		currentrun = list()
 	remove.stop_loop()

@@ -1,9 +1,15 @@
 ////////////////////////////////
 /proc/message_admins(msg)
+	if(!islist(GLOB.admins))
+		log_world("ADMIN LOG (early init): [msg]")
+		return
 	msg = span_admin("[span_prefix("ADMIN LOG: ")]<span class=\"message linkify\">[msg]</span>")
-	for(var/client/C in GLOB.admins)
-		if(check_rights_for(C, R_ADMIN))
-			to_chat(C, msg)
+	try
+		for(var/client/C in GLOB.admins)
+			if(check_rights_for(C, R_ADMIN))
+				to_chat(C, msg)
+	catch
+		log_world("ADMIN LOG (early init): [msg]")
 
 
 /proc/relay_msg_admins(msg)

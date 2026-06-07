@@ -127,9 +127,21 @@ SAVEFILE UPDATING/VERSIONING - 'Simplified', or rather, more coder-friendly ~Car
 	//ERP PREF REDMOON
 	S["erppref"]			>> erppref
 	S["nonconpref"]			>> nonconpref
+	S["vorepref"]			>> vorepref
+	S["mobsexpref"]			>> mobsexpref
+	S["hornyantagspref"]	>> hornyantagspref
+	S["tattoopref"]			>> tattoopref
 	S["unholypref"]			>> unholypref
 	S["extremepref"]		>> extremepref
 	S["extremeharm"]		>> extremeharm
+	S["arousable"]			>> arousable
+	S["lust_tolerance"]		>> lust_tolerance
+	S["sexual_potency"]		>> sexual_potency
+	S["use_arousal_multiplier"] >> use_arousal_multiplier
+	S["arousal_multiplier"] >> arousal_multiplier
+	S["use_moaning_multiplier"] >> use_moaning_multiplier
+	S["moaning_multiplier"] >> moaning_multiplier
+	S["favorite_interactions"] >> favorite_interactions
 	//REDMOON END
 
 	//general preferences
@@ -199,7 +211,15 @@ SAVEFILE UPDATING/VERSIONING - 'Simplified', or rather, more coder-friendly ~Car
 	asaycolor = sanitize_ooccolor(sanitize_hexcolor(asaycolor, 6, 1, initial(asaycolor)))
 	ooccolor = sanitize_ooccolor(sanitize_hexcolor(ooccolor, 6, 1, initial(ooccolor)))
 	lastchangelog = sanitize_text(lastchangelog, initial(lastchangelog))
-	UI_style = sanitize_inlist(UI_style, GLOB.available_ui_styles, GLOB.available_ui_styles[1])
+	var/default_ui_style = initial(UI_style)
+	try
+		if(islist(GLOB.available_ui_styles) && length(GLOB.available_ui_styles))
+			default_ui_style = GLOB.available_ui_styles[1]
+			UI_style = sanitize_inlist(UI_style, GLOB.available_ui_styles, default_ui_style)
+		else
+			UI_style = default_ui_style
+	catch
+		UI_style = default_ui_style
 	hotkeys = sanitize_integer(hotkeys, 0, 1, initial(hotkeys))
 	showrolls = sanitize_integer(showrolls, 0, 1, initial(showrolls))
 	max_chat_length = sanitize_integer(max_chat_length, 1, CHAT_MESSAGE_MAX_LENGTH, initial(max_chat_length))
@@ -217,10 +237,22 @@ SAVEFILE UPDATING/VERSIONING - 'Simplified', or rather, more coder-friendly ~Car
 	ambientocclusion = sanitize_integer(ambientocclusion, 0, 1, initial(ambientocclusion))
 	auto_fit_viewport = sanitize_integer(auto_fit_viewport, 0, 1, initial(auto_fit_viewport))
 	widescreenpref = sanitize_integer(widescreenpref, 0, 1, initial(widescreenpref))
-	ghost_form = sanitize_inlist(ghost_form, GLOB.ghost_forms, initial(ghost_form))
-	ghost_orbit = sanitize_inlist(ghost_orbit, GLOB.ghost_orbits, initial(ghost_orbit))
-	ghost_accs = sanitize_inlist(ghost_accs, GLOB.ghost_accs_options, GHOST_ACCS_DEFAULT_OPTION)
-	ghost_others = sanitize_inlist(ghost_others, GLOB.ghost_others_options, GHOST_OTHERS_DEFAULT_OPTION)
+	try
+		ghost_form = sanitize_inlist(ghost_form, GLOB.ghost_forms, initial(ghost_form))
+	catch
+		ghost_form = initial(ghost_form)
+	try
+		ghost_orbit = sanitize_inlist(ghost_orbit, GLOB.ghost_orbits, initial(ghost_orbit))
+	catch
+		ghost_orbit = initial(ghost_orbit)
+	try
+		ghost_accs = sanitize_inlist(ghost_accs, GLOB.ghost_accs_options, GHOST_ACCS_DEFAULT_OPTION)
+	catch
+		ghost_accs = GHOST_ACCS_DEFAULT_OPTION
+	try
+		ghost_others = sanitize_inlist(ghost_others, GLOB.ghost_others_options, GHOST_OTHERS_DEFAULT_OPTION)
+	catch
+		ghost_others = GHOST_OTHERS_DEFAULT_OPTION
 	menuoptions	= SANITIZE_LIST(menuoptions)
 	be_special = SANITIZE_LIST(be_special)
 	key_bindings = sanitize_islist(key_bindings, list())
@@ -229,6 +261,8 @@ SAVEFILE UPDATING/VERSIONING - 'Simplified', or rather, more coder-friendly ~Car
 
 	//ROGUETOWN
 	parallax = PARALLAX_INSANE
+
+	sanitize_consent_preferences()
 
 	return TRUE
 
@@ -249,9 +283,21 @@ SAVEFILE UPDATING/VERSIONING - 'Simplified', or rather, more coder-friendly ~Car
 	//ERP PREF REDMOON
 	WRITE_FILE(S["erppref"], erppref)
 	WRITE_FILE(S["nonconpref"], nonconpref)
+	WRITE_FILE(S["vorepref"], vorepref)
+	WRITE_FILE(S["mobsexpref"], mobsexpref)
+	WRITE_FILE(S["hornyantagspref"], hornyantagspref)
+	WRITE_FILE(S["tattoopref"], tattoopref)
 	WRITE_FILE(S["unholypref"], unholypref)
 	WRITE_FILE(S["extremepref"], extremepref)
 	WRITE_FILE(S["extremeharm"], extremeharm)
+	WRITE_FILE(S["arousable"], arousable)
+	WRITE_FILE(S["lust_tolerance"], lust_tolerance)
+	WRITE_FILE(S["sexual_potency"], sexual_potency)
+	WRITE_FILE(S["use_arousal_multiplier"], use_arousal_multiplier)
+	WRITE_FILE(S["arousal_multiplier"], arousal_multiplier)
+	WRITE_FILE(S["use_moaning_multiplier"], use_moaning_multiplier)
+	WRITE_FILE(S["moaning_multiplier"], moaning_multiplier)
+	WRITE_FILE(S["favorite_interactions"], favorite_interactions)
 	//REDMOON END
 
 	WRITE_FILE(S["asaycolor"], asaycolor)

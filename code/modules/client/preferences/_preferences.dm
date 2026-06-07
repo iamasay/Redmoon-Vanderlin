@@ -271,12 +271,30 @@ GLOBAL_LIST_INIT(name_adjustments, list())
 
 	// C/parent can be a client_interface
 	if(isclient(parent))
-		donator = parent.is_donator()
+		try
+			donator = parent.is_donator()
+		catch
+			donator = FALSE
 
-	for(var/custom_name_id in GLOB.preferences_custom_names)
-		custom_names[custom_name_id] = get_default_name(custom_name_id)
+	if(!islist(GLOB.preferences_custom_names))
+		GLOB.preferences_custom_names = list()
+	var/custom_name_count = 0
+	try
+		custom_name_count = length(GLOB.preferences_custom_names)
+	catch
+		GLOB.preferences_custom_names = list()
+	for(var/custom_name_index in 1 to custom_name_count)
+		var/custom_name_id
+		try
+			custom_name_id = GLOB.preferences_custom_names[custom_name_index]
+			custom_names[custom_name_id] = get_default_name(custom_name_id)
+		catch
+			continue
 
-	UI_style = GLOB.available_ui_styles[1]
+	try
+		UI_style = GLOB.available_ui_styles[1]
+	catch
+		UI_style = initial(UI_style)
 
 	if(istype(C))
 		if(!IsGuestKey(C.key))
@@ -286,23 +304,62 @@ GLOBAL_LIST_INIT(name_adjustments, list())
 				max_save_slots += 5
 		if(donator)
 			max_save_slots += 30
-	var/loaded_preferences_successfully = load_preferences()
+	var/loaded_preferences_successfully = FALSE
+	try
+		loaded_preferences_successfully = load_preferences()
+	catch
+		loaded_preferences_successfully = FALSE
 	if(loaded_preferences_successfully)
-		if(load_character())
-			if(check_nameban(C.ckey))
-				real_name = pref_species.random_name(gender,1)
+		var/loaded_character_successfully = FALSE
+		try
+			loaded_character_successfully = load_character()
+		catch
+			loaded_character_successfully = FALSE
+		if(loaded_character_successfully)
+			try
+				if(check_nameban(C.ckey))
+					real_name = pref_species.random_name(gender,1)
+			catch
+				EMPTY_BLOCK_GUARD
 			return
 	//we couldn't load character data so just randomize the character appearance + name
-	randomise_appearance_prefs(include_donator = donator)		//let's create a random character then - rather than a fat, bald and naked man.
+	try
+		randomise_appearance_prefs(include_donator = donator)		//let's create a random character then - rather than a fat, bald and naked man.
+	catch
+		EMPTY_BLOCK_GUARD
 	if(!selected_patron)
-		selected_patron = GLOB.patrons_by_type[default_patron]
-	key_bindings = deepCopyList(GLOB.hotkey_keybinding_list_by_key) // give them default keybinds and update their movement keys
+		try
+			selected_patron = GLOB.patrons_by_type[default_patron]
+		catch
+			selected_patron = null
+	if(!selected_patron && islist(GLOB.patrons_by_type))
+		try
+			var/first_patron_key = GLOB.patrons_by_type[1]
+			selected_patron = GLOB.patrons_by_type[first_patron_key]
+		catch
+			selected_patron = null
+	try
+		key_bindings = deepCopyList(GLOB.hotkey_keybinding_list_by_key) // give them default keybinds and update their movement keys
+	catch
+		key_bindings = list()
 	if(isclient(C))
-		C.update_movement_keys()
-	real_name = pref_species.random_name(gender,1)
+		try
+			C.update_movement_keys()
+		catch
+			EMPTY_BLOCK_GUARD
+	try
+		real_name = pref_species.random_name(gender,1)
+	catch
+		real_name = random_unique_name(gender)
 	if(!loaded_preferences_successfully)
-		save_preferences()
-	save_character()		//let's save this new random character so it doesn't keep generating new ones.
+		try
+			save_preferences()
+		catch
+			EMPTY_BLOCK_GUARD
+	try
+		save_character()		//let's save this new random character so it doesn't keep generating new ones.
+	catch
+		EMPTY_BLOCK_GUARD
 	menuoptions = list()
 
 // I don't think this ever runs currently, because the prefs window has can_close = FALSE by default
@@ -356,7 +413,32 @@ GLOBAL_LIST_INIT(name_adjustments, list())
 
 /datum/preferences/proc/build_and_show_menu(mob/user)
 	var/list/dat = list()
-	var/datum/faith/selected_faith = GLOB.faith_list[selected_patron.associated_faith]
+	var/datum/patron/safe_patron = selected_patron
+	if(!safe_patron)
+		try
+			if(islist(GLOB.patrons_by_type))
+				safe_patron = GLOB.patrons_by_type[default_patron]
+		catch
+			safe_patron = null
+	if(!safe_patron && ispath(default_patron))
+		try
+			safe_patron = new default_patron()
+		catch
+			safe_patron = null
+	if(!safe_patron && islist(GLOB.patrons_by_type))
+		try
+			var/first_patron_key = GLOB.patrons_by_type[1]
+			safe_patron = GLOB.patrons_by_type[first_patron_key]
+		catch
+			safe_patron = null
+	selected_patron = safe_patron
+	var/datum/faith/selected_faith = null
+	try
+		var/selected_faith_type = selected_patron ? selected_patron.associated_faith : null
+		if(islist(GLOB.faith_list) && selected_faith_type)
+			selected_faith = GLOB.faith_list[selected_faith_type]
+	catch
+		selected_faith = null
 	var/datum/job/high_job
 	for(var/job_type in job_preferences)
 		if(job_preferences[job_type] != JP_HIGH)
@@ -668,12 +750,12 @@ GLOBAL_LIST_INIT(name_adjustments, list())
 	</div>
 	<div class="sprite" style="top:30px; left:122px; width:46px; height:9px; background-image: url('header_species.png');">
 		<a href='?_src_=prefs;preference=species;task=input' style="text-decoration: none; display: block; width: 100%; height: 100%;">
-			<div id="char-species" class="clickable-text auto-shrink" style="width:46px; height:9px;">[pref_species.name]</div>
+			<div id="char-species" class="clickable-text auto-shrink" style="width:46px; height:9px;">[pref_species?.name || "Unknown"]</div>
 		</a>
 	</div>
 	<div class="sprite" style="top:30px; left:172px; width:42px; height:9px; background-image: url('header_patron.png');">
 		<a href='?_src_=prefs;preference=patron;task=input' style="text-decoration: none; display: block; width: 100%; height: 100%;">
-			<div id="char-patron" class="clickable-text auto-shrink" style="width:42px; height:9px;">[selected_patron.name]</div>
+			<div id="char-patron" class="clickable-text auto-shrink" style="width:42px; height:9px;">[selected_patron?.name || "None"]</div>
 		</a>
 	</div>
 	<div class="sprite" style="top:30px; left:220px; width:31px; height:9px; background-image: url('header_pq.png');">
@@ -794,7 +876,32 @@ GLOBAL_LIST_INIT(name_adjustments, list())
 	if(!winexists(user, "preferences_browser"))
 		return
 
-	var/datum/faith/selected_faith = GLOB.faith_list[selected_patron.associated_faith]
+	var/datum/patron/safe_patron = selected_patron
+	if(!safe_patron)
+		try
+			if(islist(GLOB.patrons_by_type))
+				safe_patron = GLOB.patrons_by_type[default_patron]
+		catch
+			safe_patron = null
+	if(!safe_patron && ispath(default_patron))
+		try
+			safe_patron = new default_patron()
+		catch
+			safe_patron = null
+	if(!safe_patron && islist(GLOB.patrons_by_type))
+		try
+			var/first_patron_key = GLOB.patrons_by_type[1]
+			safe_patron = GLOB.patrons_by_type[first_patron_key]
+		catch
+			safe_patron = null
+	selected_patron = safe_patron
+	var/datum/faith/selected_faith = null
+	try
+		var/selected_faith_type = selected_patron ? selected_patron.associated_faith : null
+		if(islist(GLOB.faith_list) && selected_faith_type)
+			selected_faith = GLOB.faith_list[selected_faith_type]
+	catch
+		selected_faith = null
 	var/datum/job/high_job
 	for(var/job_type in job_preferences)
 		if(job_preferences[job_type] != JP_HIGH)
@@ -814,9 +921,9 @@ GLOBAL_LIST_INIT(name_adjustments, list())
 	if(update_all || ("faith" in fields_to_update))
 		params["faith"] = selected_faith?.name || ""
 	if(update_all || ("species" in fields_to_update))
-		params["species"] = pref_species.name
+		params["species"] = pref_species?.name || "Unknown"
 	if(update_all || ("patron" in fields_to_update))
-		params["patron"] = selected_patron.name
+		params["patron"] = selected_patron?.name || "None"
 	if(update_all || ("pq" in fields_to_update))
 		params["pq"] = get_playerquality(user.ckey, text = TRUE)
 	if(update_all || ("age" in fields_to_update))
@@ -1633,6 +1740,10 @@ GLOBAL_LIST_INIT(name_adjustments, list())
 				ask_for_custom_name(user,href_list["preference"])
 
 			switch(href_list["preference"])
+				if("lust_tolerance", "sexual_potency", "arousal_multiplier", "moaning_multiplier")
+					if(handle_consent_preference_input(user, href_list["preference"]))
+						refresh_consent_preferences_ui(user)
+						return
 				if("name")
 					var/new_name = browser_input_text(user, "DECIDE YOUR HERO'S IDENTITY", "THE SELF", real_name, MAX_NAME_LEN, encode = FALSE)
 					if(new_name)
@@ -1687,40 +1798,94 @@ GLOBAL_LIST_INIT(name_adjustments, list())
 						to_chat(user, span_warning("Your character will now vocalize with a [lowertext(voice_type)] affect."))
 				if("faith")
 					var/list/faiths_named = list()
-					for(var/datum/faith/faith as anything in GLOB.faith_list)
-						faith = GLOB.faith_list[faith]
-						if(!faith.preference_accessible(src))
-							continue
-						faiths_named["\The [faith.name]"] = faith
-					var/faith_input = browser_input_list(user, "SELECT YOUR HERO'S BELIEF", "PUPPETS ON STRINGS", faiths_named, "\The [selected_patron.associated_faith::name]")
+					if(islist(GLOB.faith_list))
+						var/faith_count = 0
+						try
+							faith_count = length(GLOB.faith_list)
+						catch
+							faith_count = 0
+						for(var/faith_index in 1 to faith_count)
+							var/faith_key
+							var/datum/faith/faith
+							try
+								faith_key = GLOB.faith_list[faith_index]
+								faith = GLOB.faith_list[faith_key]
+								if(!faith?.preference_accessible(src))
+									continue
+								faiths_named["\The [faith.name]"] = faith
+							catch
+								continue
+					var/selected_faith_name = null
+					try
+						var/selected_faith_type = selected_patron ? selected_patron.associated_faith : null
+						if(islist(GLOB.faith_list) && selected_faith_type)
+							var/datum/faith/selected_faith_datum = GLOB.faith_list[selected_faith_type]
+							selected_faith_name = selected_faith_datum?.name
+					catch
+						selected_faith_name = null
+					var/faith_input = browser_input_list(user, "SELECT YOUR HERO'S BELIEF", "PUPPETS ON STRINGS", faiths_named, selected_faith_name ? "\The [selected_faith_name]" : null)
 					if(faith_input)
 						var/datum/faith/faith = faiths_named[faith_input]
 						to_chat(user, "<font color='purple'>Faith: [faith.name]</font>")
 						to_chat(user, "<font color='purple'>Background: [faith.desc]</font>")
-						selected_patron = GLOB.patrons_by_type[faith.godhead] || GLOB.patrons_by_type[pick(GLOB.patrons_by_faith[faith.type])]
+						try
+							selected_patron = GLOB.patrons_by_type[faith.godhead] || GLOB.patrons_by_type[pick(GLOB.patrons_by_faith[faith.type])]
+						catch
+							EMPTY_BLOCK_GUARD
 
 				if("patron")
 					var/list/patrons_named = list()
-					for(var/datum/patron/patron as anything in GLOB.patrons_by_faith[selected_patron.associated_faith || initial(default_patron.associated_faith)])
-						patron = GLOB.patrons_by_type[patron]
-						if(!patron.preference_accessible(src))
-							continue
-						var/pref_name = patron.display_name ? patron.display_name : patron.name
-						patrons_named[pref_name] = patron
+					var/faith_type = null
+					try
+						if(selected_patron)
+							faith_type = selected_patron.associated_faith
+						if(!faith_type)
+							faith_type = initial(default_patron.associated_faith)
+					catch
+						faith_type = null
+					var/list/patrons_in_faith = null
+					try
+						patrons_in_faith = GLOB.patrons_by_faith[faith_type]
+					catch
+						patrons_in_faith = null
+					if(islist(patrons_in_faith))
+						var/patron_count = 0
+						try
+							patron_count = length(patrons_in_faith)
+						catch
+							patron_count = 0
+						for(var/patron_index in 1 to patron_count)
+							var/patron_key
+							var/datum/patron/patron
+							try
+								patron_key = patrons_in_faith[patron_index]
+								patron = GLOB.patrons_by_type[patron_key]
+								if(!patron?.preference_accessible(src))
+									continue
+								var/pref_name = patron.display_name ? patron.display_name : patron.name
+								patrons_named[pref_name] = patron
+							catch
+								continue
 
 					if(length(patrons_named))
-						var/datum/faith/current_faith = GLOB.faith_list[selected_patron.associated_faith] || GLOB.faith_list[initial(default_patron.associated_faith)]
-						var/god_input = browser_input_list(user, "SELECT YOUR HERO'S PATRON GOD", uppertext("\The [current_faith.name]"), patrons_named, selected_patron)
+						var/datum/faith/current_faith = null
+						try
+							var/current_faith_type = selected_patron ? selected_patron.associated_faith : null
+							current_faith = GLOB.faith_list[current_faith_type] || GLOB.faith_list[initial(default_patron.associated_faith)]
+						catch
+							current_faith = null
+						var/god_input = browser_input_list(user, "SELECT YOUR HERO'S PATRON GOD", uppertext("\The [current_faith?.name || "UNKNOWN"]"), patrons_named, selected_patron)
 						if(god_input)
 							selected_patron = patrons_named[god_input]
 
-					to_chat(user, "<font color='purple'>Patron: [selected_patron]</font>")
-					to_chat(user, "<font color='purple'>Domain: [selected_patron.domain]</font>")
-					to_chat(user, "<font color='purple'>Background: [selected_patron.desc]</font>")
-					to_chat(user, "<font color='purple'>Flawed aspects: [selected_patron.flaws]</font>")
-					to_chat(user, "<font color='purple'>Likely Worshippers: [selected_patron.worshippers]</font>")
-					to_chat(user, "<font color='red'>Considers these to be Sins: [selected_patron.sins]</font>")
-					to_chat(user, "<font color='white'>Blessed with boon(s): [selected_patron.boons]</font>")
+					if(selected_patron)
+						to_chat(user, "<font color='purple'>Patron: [selected_patron]</font>")
+						to_chat(user, "<font color='purple'>Domain: [selected_patron.domain]</font>")
+						to_chat(user, "<font color='purple'>Background: [selected_patron.desc]</font>")
+						to_chat(user, "<font color='purple'>Flawed aspects: [selected_patron.flaws]</font>")
+						to_chat(user, "<font color='purple'>Likely Worshippers: [selected_patron.worshippers]</font>")
+						to_chat(user, "<font color='red'>Considers these to be Sins: [selected_patron.sins]</font>")
+						to_chat(user, "<font color='white'>Blessed with boon(s): [selected_patron.boons]</font>")
 
 				if("voice")
 					var/new_voice = input(user, "SELECT YOUR HERO'S VOICE COLOR", "THE THROAT","#"+voice_color) as color|null
@@ -2013,6 +2178,9 @@ GLOBAL_LIST_INIT(name_adjustments, list())
 					to_chat(user, span_notice("[culture::name]"))
 					to_chat(user, span_notice("[culture::description]"))
 		else
+			if(handle_consent_preference_cycle(user, href_list["preference"]))
+				refresh_consent_preferences_ui(user)
+				return 1
 			switch(href_list["preference"])
 				if ("max_chat_length")
 					var/desiredlength = input(user, "Choose the max character length of shown Runechat messages. Valid range is 1 to [CHAT_MESSAGE_MAX_LENGTH] (default: [initial(max_chat_length)]))", "Character Preference", max_chat_length)  as null|num
@@ -2351,7 +2519,11 @@ GLOBAL_LIST_INIT(name_adjustments, list())
 	character.transform = matrix() // reset transforms anyway just in case, to avoid drift from setting and unsetting small/large build
 	character.age = age
 	character.gender = gender
-	character.set_patron(selected_patron)
+	try
+		if(selected_patron)
+			character.set_patron(selected_patron)
+	catch
+		EMPTY_BLOCK_GUARD
 	character.set_species(pref_species.type, icon_update = FALSE, pref_load = src)
 	if(real_name in GLOB.chosen_names)
 		character.real_name = pref_species.random_name(gender)
@@ -2433,6 +2605,8 @@ GLOBAL_LIST_INIT(name_adjustments, list())
 		change_accent = FALSE
 
 	/* :V */
+
+	apply_consent_prefs_to(character)
 
 	if(icon_updates)
 		character.update_body()

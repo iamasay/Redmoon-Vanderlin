@@ -15,20 +15,24 @@ SUBSYSTEM_DEF(paintings)
 /datum/controller/subsystem/paintings/proc/update_paintings()
 	paintings = list()
 
-	paintings = pull_player_painting_titles()
-	for(var/painting in paintings)
+	var/list/titles = pull_player_painting_titles()
+	if(!length(titles))
+		return
+
+	for(var/painting in titles)
 		if(!length(file2playerpainting(painting)))
-			paintings -= painting
 			continue
 		paintings[painting] = file2playerpainting(painting)
 
 /datum/controller/subsystem/paintings/proc/pull_player_painting_titles()
 	if(fexists(file("data/player_generated_paintings/_painting_titles.json")))
 		var/json_file = file("data/player_generated_paintings/_painting_titles.json")
-		var/json_list = json_decode(file2text(json_file))
+		var/list/json_list = json_decode(file2text(json_file))
+		if(!islist(json_list))
+			return list()
 		return json_list
-	else
-		message_admins("!!! _painting_titles.json no longer exists, previous painting title list has been lost. !!!")
+	log_world("!!! _painting_titles.json no longer exists, previous painting title list has been lost. !!!")
+	return list()
 
 /datum/controller/subsystem/paintings/proc/file2playerpainting(filename)
 	if(!filename)

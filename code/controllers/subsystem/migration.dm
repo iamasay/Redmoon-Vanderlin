@@ -223,16 +223,36 @@ SUBSYSTEM_DEF(migrants)
 
 /datum/controller/subsystem/migrants/proc/get_influenceable_waves()
 	var/list/waves = list()
-	for(var/wave_type in GLOB.migrant_waves)
-		var/datum/migrant_wave/wave = MIGRANT_WAVE(wave_type)
-		if(!wave.can_roll)
+	if(!islist(GLOB.migrant_waves))
+		GLOB.migrant_waves = list()
+	if(!islist(spawned_waves))
+		spawned_waves = list()
+	var/wave_count = 0
+	try
+		wave_count = length(GLOB.migrant_waves)
+	catch
+		wave_count = 0
+	for(var/wave_index in 1 to wave_count)
+		var/wave_type
+		var/datum/migrant_wave/wave
+		try
+			wave_type = GLOB.migrant_waves[wave_index]
+			wave = MIGRANT_WAVE(wave_type)
+		catch
+			continue
+		if(!wave?.can_roll)
 			continue
 		// Only show waves that haven't hit max spawns
 		if(!isnull(wave.max_spawns))
 			var/used_wave_type = wave.type
 			if(wave.shared_wave_type)
 				used_wave_type = wave.shared_wave_type
-			if(spawned_waves[used_wave_type] && spawned_waves[used_wave_type] >= wave.max_spawns)
+			var/used_count = 0
+			try
+				used_count = spawned_waves[used_wave_type] || 0
+			catch
+				used_count = 0
+			if(used_count >= wave.max_spawns)
 				continue
 		waves += wave_type
 	return waves

@@ -164,12 +164,39 @@ INITIALIZE_IMMEDIATE(/obj/effect/mapping_helpers/no_lava)
 		qdel(src)
 		return
 
-	for(var/obj/item/clothing/clothing in get_turf(src))
-		located.equip_to_appropriate_slot(clothing)
+	var/list/clothing_to_equip = list()
+	var/list/weapons_to_equip = list()
+	var/turf/source_turf = get_turf(src)
+	try
+		for(var/obj/item/clothing/clothing in source_turf)
+			clothing_to_equip += clothing
+	catch
+		clothing_to_equip = list()
+	try
+		for(var/obj/item/weapon/weapon in source_turf)
+			weapons_to_equip += weapon
+	catch
+		weapons_to_equip = list()
 
-	for(var/obj/item/weapon/weapon in get_turf(src))
-		located.put_in_hands(weapon)
-	qdel(src)
+	for(var/obj/item/clothing/clothing as anything in clothing_to_equip)
+		if(QDELETED(clothing))
+			continue
+		try
+			located.equip_to_appropriate_slot(clothing)
+		catch
+			continue
+
+	for(var/obj/item/weapon/weapon as anything in weapons_to_equip)
+		if(QDELETED(weapon))
+			continue
+		try
+			located.put_in_hands(weapon)
+		catch
+			continue
+	try
+		qdel(src)
+	catch
+		EMPTY_BLOCK_GUARD
 
 /obj/effect/mapping_helpers/access
 	name = "access helper parent"

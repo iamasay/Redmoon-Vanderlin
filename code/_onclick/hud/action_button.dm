@@ -254,7 +254,10 @@
 
 /atom/movable/screen/button_palette/proc/set_hud(datum/hud/our_hud)
 	src.our_hud = our_hud
-	refresh_owner()
+	try
+		refresh_owner()
+	catch
+		EMPTY_BLOCK_GUARD
 
 /atom/movable/screen/button_palette/update_name(updates)
 	. = ..()
@@ -264,17 +267,35 @@
 		name = "Show Buttons"
 
 /atom/movable/screen/button_palette/proc/refresh_owner()
+	if(!our_hud)
+		return
 	var/mob/viewer = our_hud.mymob
-	if(viewer.client)
-		viewer.client.screen |= src
+	if(viewer?.client)
+		try
+			viewer.client.screen |= src
+		catch
+			viewer.client.screen = list(src)
 
-	var/list/settings = our_hud.get_action_buttons_icons()
-	var/ui_icon = "[settings["bg_icon"]]"
+	var/list/settings
+	var/ui_icon
+	try
+		settings = our_hud.get_action_buttons_icons()
+		ui_icon = "[settings["bg_icon"]]"
+	catch
+		ui_icon = ""
+	if(!length(ui_icon))
+		icon_state = "palette"
+		return
 	var/list/ui_segments = splittext(ui_icon, ".")
-	var/list/ui_paths = splittext(ui_segments[1], "/")
+	if(!islist(ui_segments) || !length(ui_segments))
+		icon_state = "palette"
+		return
+	var/list/ui_paths = splittext("[ui_segments[1]]", "/")
+	if(!islist(ui_paths) || !length(ui_paths))
+		icon_state = "palette"
+		return
 	var/ui_name = ui_paths[length(ui_paths)]
-
-	icon_state = "[ui_name]_palette"
+	icon_state = "[ui_name || "palette"]_palette"
 
 /atom/movable/screen/button_palette/MouseEntered(location, control, params)
 	. = ..()
@@ -374,12 +395,20 @@ GLOBAL_LIST_INIT(palette_removed_matrix, list(1.4,0,0,0, 0.7,0.4,0,0, 0.4,0,0.6,
 
 /atom/movable/screen/palette_scroll/proc/set_hud(datum/hud/our_hud)
 	src.our_hud = our_hud
-	refresh_owner()
+	try
+		refresh_owner()
+	catch
+		EMPTY_BLOCK_GUARD
 
 /atom/movable/screen/palette_scroll/proc/refresh_owner()
+	if(!our_hud)
+		return
 	var/mob/viewer = our_hud.mymob
-	if(viewer.client)
-		viewer.client.screen |= src
+	if(viewer?.client)
+		try
+			viewer.client.screen |= src
+		catch
+			viewer.client.screen = list(src)
 
 /atom/movable/screen/palette_scroll/Click(location, control, params)
 	if(!can_use(usr))

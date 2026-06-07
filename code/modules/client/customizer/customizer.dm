@@ -1,4 +1,5 @@
 /datum/customizer
+	abstract_type = /datum/customizer
 	/// User facing name of the customizer.
 	var/name = "Customizer"
 	/// List of all /datum/customizer_choice's that this customizer can pick from.
@@ -13,7 +14,8 @@
 /datum/customizer/New()
 	. = ..()
 	if(!length(customizer_choices))
-		CRASH("Customizer [type] lacks choices")
+		log_world("Skipping customizer [type]: no choices configured.")
+		return
 	if(!default_choice)
 		default_choice = customizer_choices[1]
 

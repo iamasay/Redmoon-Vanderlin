@@ -50,18 +50,39 @@
 		winset(src, null, "input.focus=true ; input.text=[url_encode(_key)]")
 		return
 
-	if(length(keys_held) > MAX_HELD_KEYS)
-		keys_held.Cut(1,2)
-	keys_held[_key] = TRUE
-	var/movement = movement_keys[_key]
-	if(!(next_move_dir_sub & movement) && !keys_held["Ctrl"])
+	try
+		if(!islist(keys_held))
+			keys_held = list()
+		if(length(keys_held) > MAX_HELD_KEYS)
+			keys_held.Cut(1,2)
+		keys_held[_key] = TRUE
+	catch
+		keys_held = list()
+		keys_held[_key] = TRUE
+	var/movement
+	try
+		movement = islist(movement_keys) ? movement_keys[_key] : null
+	catch
+		movement = null
+	var/ctrl_held = FALSE
+	try
+		ctrl_held = islist(keys_held) && keys_held["Ctrl"]
+	catch
+		keys_held = list()
+	if(!(next_move_dir_sub & movement) && !ctrl_held)
 		next_move_dir_add |= movement
 
 	// Client-level keybindings are ones anyone should be able to do at any time
 	// Things like taking screenshots, hitting tab, and adminhelps.
-	var/AltMod = keys_held["Alt"] ? "Alt" : ""
-	var/CtrlMod = keys_held["Ctrl"] ? "Ctrl" : ""
-	var/ShiftMod = keys_held["Shift"] ? "Shift" : ""
+	var/AltMod = ""
+	var/CtrlMod = ""
+	var/ShiftMod = ""
+	try
+		AltMod = islist(keys_held) && keys_held["Alt"] ? "Alt" : ""
+		CtrlMod = islist(keys_held) && keys_held["Ctrl"] ? "Ctrl" : ""
+		ShiftMod = islist(keys_held) && keys_held["Shift"] ? "Shift" : ""
+	catch
+		keys_held = list()
 	var/full_key
 	switch(_key)
 		if("Alt", "Ctrl", "Shift")
@@ -69,19 +90,36 @@
 		else
 			full_key = "[AltMod][CtrlMod][ShiftMod][_key]"
 	var/keycount = 0
-	for(var/kb_name in prefs.key_bindings[full_key])
-		keycount++
-		var/datum/keybinding/kb = GLOB.keybindings_by_name[kb_name]
-		if(istype(kb, /datum/keybinding/client/say))
-			continue
-		if(kb)
-			if(kb.can_use(src) && kb.down(src) && keycount >= MAX_COMMANDS_PER_KEY)
-				break
+	var/list/key_bindings = null
+	try
+		key_bindings = prefs?.key_bindings[full_key]
+	catch
+		key_bindings = null
+	if(islist(key_bindings))
+		var/key_binding_count = 0
+		try
+			key_binding_count = length(key_bindings)
+		catch
+			key_binding_count = 0
+		for(var/key_binding_index in 1 to key_binding_count)
+			var/kb_name
+			var/datum/keybinding/kb
+			try
+				kb_name = key_bindings[key_binding_index]
+				kb = GLOB.keybindings_by_name[kb_name]
+			catch
+				continue
+			keycount++
+			if(istype(kb, /datum/keybinding/client/say))
+				continue
+			if(kb)
+				if(kb.can_use(src) && kb.down(src) && keycount >= MAX_COMMANDS_PER_KEY)
+					break
 
 
 	holder?.key_down(_key, src)
-	mob.focus?.key_down(_key, src)
-	mob.update_mouse_pointer()
+	mob?.focus?.key_down(_key, src)
+	mob?.update_mouse_pointer()
 
 /client/verb/keyUp(_key as text)
 	set instant = TRUE
@@ -97,20 +135,45 @@
 		var/datum/buildmode/B = click_intercept
 		B.toggle_pixel_positioning_mode(FALSE)
 
-	keys_held -= _key
-	var/movement = movement_keys[_key]
+	try
+		if(islist(keys_held))
+			keys_held -= _key
+	catch
+		keys_held = list()
+	var/movement
+	try
+		movement = islist(movement_keys) ? movement_keys[_key] : null
+	catch
+		movement = null
 	if(!(next_move_dir_add & movement))
 		next_move_dir_sub |= movement
 
 	// We don't do full key for release, because for mod keys you
 	// can hold different keys and releasing any should be handled by the key binding specifically
-	for (var/kb_name in prefs.key_bindings[_key])
-		var/datum/keybinding/kb = GLOB.keybindings_by_name[kb_name]
-		if(istype(kb, /datum/keybinding/client/say))
-			continue
-		if(kb)
-			if(kb.up(src))
-				break
+	var/list/key_bindings = null
+	try
+		key_bindings = prefs?.key_bindings[_key]
+	catch
+		key_bindings = null
+	if(islist(key_bindings))
+		var/key_binding_count = 0
+		try
+			key_binding_count = length(key_bindings)
+		catch
+			key_binding_count = 0
+		for(var/key_binding_index in 1 to key_binding_count)
+			var/kb_name
+			var/datum/keybinding/kb
+			try
+				kb_name = key_bindings[key_binding_index]
+				kb = GLOB.keybindings_by_name[kb_name]
+			catch
+				continue
+			if(istype(kb, /datum/keybinding/client/say))
+				continue
+			if(kb)
+				if(kb.up(src))
+					break
 	holder?.key_up(_key, src)
 	mob.focus?.key_up(_key, src)
 	mob.update_mouse_pointer()

@@ -3,19 +3,43 @@
 /datum/preferences/proc/randomise_appearance_prefs(randomise_flags = ALL, include_donator = FALSE)
 	if(randomise_flags & RANDOMIZE_SPECIES)
 		var/list/species_list = list()
-		for(var/species_id in GLOB.roundstart_species)
-			var/species_type = GLOB.species_list[species_id]
-
-			var/datum/species/species = new species_type()
-			if(!species.preference_accessible(src))
+		var/roundstart_species_count = 0
+		try
+			roundstart_species_count = length(GLOB.roundstart_species)
+		catch
+			GLOB.roundstart_species = list()
+		for(var/species_index in 1 to roundstart_species_count)
+			var/species_id
+			var/species_type
+			try
+				species_id = GLOB.roundstart_species[species_index]
+				species_type = GLOB.species_list[species_id]
+			catch
 				continue
 
-			species_list += species.type
+			var/datum/species/species
+			try
+				species = new species_type()
+			catch
+				continue
+			if(!species?.preference_accessible(src))
+				continue
 
-		var/rando_race = pick(species_list)
-		pref_species = new rando_race()
+			try
+				species_list += species.type
+			catch
+				species_list = list(species.type)
 
-	if(NOEYESPRITES in pref_species.species_traits)
+		if(length(species_list))
+			var/rando_race = pick(species_list)
+			pref_species = new rando_race()
+
+	var/no_eye_sprites = FALSE
+	try
+		no_eye_sprites = islist(pref_species.species_traits) && (NOEYESPRITES in pref_species.species_traits)
+	catch
+		no_eye_sprites = FALSE
+	if(no_eye_sprites)
 		randomise_flags &= ~RANDOMIZE_EYE_COLOR
 
 	if(randomise_flags & RANDOMIZE_GENDER)
@@ -41,21 +65,40 @@
 			allowed_voices = VOICE_TYPES_LIST
 			voice_type = VOICE_TYPE_ANDRO
 
-	if(!allowed_voices || !length(allowed_voices))
-		allowed_voices = VOICE_TYPE_ANDRO
+	var/allowed_voice_count = 0
+	try
+		allowed_voice_count = length(allowed_voices)
+	catch
+		allowed_voice_count = 0
+	if(!allowed_voices || !allowed_voice_count)
+		allowed_voices = VOICE_TYPES_LIST
 
-	if(!(voice_type in allowed_voices))
-		voice_type = pick(allowed_voices)
+	try
+		if(!(voice_type in allowed_voices))
+			voice_type = pick(allowed_voices)
+	catch
+		voice_type = VOICE_TYPE_ANDRO
 
 	var/list/allowed_pronouns = pref_species.allowed_pronouns
-	if(!allowed_pronouns || !length(allowed_pronouns))
+	var/allowed_pronoun_count = 0
+	try
+		allowed_pronoun_count = length(allowed_pronouns)
+	catch
+		allowed_pronoun_count = 0
+	if(!allowed_pronouns || !allowed_pronoun_count)
 		allowed_pronouns = PRONOUNS_LIST
 
-	if (!(pronouns in allowed_pronouns))
-		pronouns = pick(allowed_pronouns)
+	try
+		if (!(pronouns in allowed_pronouns))
+			pronouns = pick(allowed_pronouns)
+	catch
+		pronouns = THEY_THEM
 
 	if(randomise_flags & RANDOMIZE_AGE)
-		age = pick(pref_species.possible_ages)
+		try
+			age = pick(pref_species.possible_ages)
+		catch
+			age = initial(age)
 
 	if(randomise_flags & RANDOMIZE_NAME)
 		real_name = pref_species.random_name(gender, TRUE)
@@ -131,7 +174,15 @@
 	accessory = "Nothing"
 
 /datum/preferences/proc/random_species()
-	var/rando_race = GLOB.species_list[pick(GLOB.roundstart_species)]
+	var/rando_race = null
+	try
+		if(islist(GLOB.roundstart_species) && length(GLOB.roundstart_species))
+			var/species_id = pick(GLOB.roundstart_species)
+			rando_race = GLOB.species_list[species_id]
+	catch
+		rando_race = null
+	if(!rando_race)
+		return
 	pref_species = new rando_race()
 	if(randomise[RANDOM_NAME])
 		real_name = pref_species.random_name(gender, TRUE)
@@ -143,19 +194,45 @@
 	// Determine what job is marked as 'High' priority, and dress them up as such.
 	var/datum/job/previewJob
 	var/highest_pref = 0
-	for(var/job in job_preferences)
-		if(job_preferences[job] > highest_pref)
-			previewJob = SSjob.GetJob(job)
-			highest_pref = job_preferences[job]
+	if(!islist(job_preferences))
+		job_preferences = list()
+	var/job_pref_count = 0
+	try
+		job_pref_count = length(job_preferences)
+	catch
+		job_pref_count = 0
+	for(var/job_pref_index in 1 to job_pref_count)
+		var/job
+		var/job_priority = 0
+		try
+			job = job_preferences[job_pref_index]
+			job_priority = job_preferences[job]
+		catch
+			continue
+		if(job_priority > highest_pref)
+			try
+				previewJob = SSjob.GetJob(job)
+				highest_pref = job_priority
+			catch
+				continue
 
 	// Set up the dummy for its photoshoot
-	var/mob/living/carbon/human/dummy/mannequin = generate_or_wait_for_human_dummy(DUMMY_HUMAN_SLOT_PREFERENCES)
+	var/mob/living/carbon/human/dummy/mannequin
+	var/used_dummy = FALSE
+	try
+		mannequin = generate_or_wait_for_human_dummy(DUMMY_HUMAN_SLOT_PREFERENCES)
+		if(!mannequin)
+			return
+		used_dummy = TRUE
 
-	apply_prefs_to(mannequin, TRUE)
+		apply_prefs_to(mannequin, TRUE)
 
-	if(previewJob)
-		mannequin.job = previewJob.title
-		mannequin.dress_up_as_job(previewJob, TRUE)
+		if(previewJob)
+			mannequin.job = previewJob.title
+			mannequin.dress_up_as_job(previewJob, TRUE)
 
-	parent.show_character_previews(new /mutable_appearance(mannequin), dir)
-	unset_busy_human_dummy(DUMMY_HUMAN_SLOT_PREFERENCES)
+		parent.show_character_previews(new /mutable_appearance(mannequin), dir)
+	catch
+		EMPTY_BLOCK_GUARD
+	if(used_dummy)
+		unset_busy_human_dummy(DUMMY_HUMAN_SLOT_PREFERENCES)

@@ -24,8 +24,20 @@
 	add_to_global_list()
 
 /datum/twitch_data/proc/add_to_global_list()
-	GLOB.donator_data_by_key[owner.key] += access_rank
-	GLOB.donator_data_by_ckey[owner.ckey] += access_rank
+	try
+		if(!islist(GLOB.donator_data_by_key))
+			GLOB.donator_data_by_key = list()
+		GLOB.donator_data_by_key[owner.key] = (GLOB.donator_data_by_key[owner.key] || 0) + access_rank
+	catch
+		GLOB.donator_data_by_key = list()
+		GLOB.donator_data_by_key[owner.key] = access_rank
+	try
+		if(!islist(GLOB.donator_data_by_ckey))
+			GLOB.donator_data_by_ckey = list()
+		GLOB.donator_data_by_ckey[owner.ckey] = (GLOB.donator_data_by_ckey[owner.ckey] || 0) + access_rank
+	catch
+		GLOB.donator_data_by_ckey = list()
+		GLOB.donator_data_by_ckey[owner.ckey] = access_rank
 
 /datum/twitch_data/proc/fetch_key_and_rank()
 	if(!SSdbcore.IsConnectedCross())
@@ -50,9 +62,19 @@
 			access_rank =  ACCESS_TWITCH_SUB_TIER_3
 
 /datum/twitch_data/proc/has_access(rank)
-	if(owner.ckey in GLOB.contributors)
+	var/is_contributor = FALSE
+	var/is_deadmined = FALSE
+	try
+		is_contributor = islist(GLOB.contributors) && (owner.ckey in GLOB.contributors)
+	catch
+		GLOB.contributors = list()
+	try
+		is_deadmined = islist(GLOB.deadmins) && (owner.ckey in GLOB.deadmins)
+	catch
+		is_deadmined = FALSE
+	if(is_contributor)
 		return TRUE
-	if(owner.holder || (owner.ckey in GLOB.deadmins))
+	if(owner.holder || is_deadmined)
 		return TRUE
 	// Only care about access if the above isn't true.
 	if(!access_rank)

@@ -2396,11 +2396,27 @@
 			limbless_slowdown += (default_num_hands - usable_hands) * 3
 		var/list/slowdown_mods = list()
 		SEND_SIGNAL(src, COMSIG_LIVING_LIMBLESS_MOVESPEED_UPDATE, slowdown_mods)
-		for(var/num in slowdown_mods)
+		var/slowdown_mod_count = 0
+		try
+			slowdown_mod_count = length(slowdown_mods)
+		catch
+			slowdown_mods = list()
+		for(var/slowdown_mod_index in 1 to slowdown_mod_count)
+			var/num
+			try
+				num = slowdown_mods[slowdown_mod_index]
+			catch
+				continue
 			limbless_slowdown *= num
-		add_movespeed_modifier(MOVESPEED_ID_LIVING_LIMBLESS, update=TRUE, priority=100, override=TRUE, multiplicative_slowdown=limbless_slowdown, movetypes=GROUND)
+		try
+			add_movespeed_modifier(MOVESPEED_ID_LIVING_LIMBLESS, update=TRUE, priority=100, override=TRUE, multiplicative_slowdown=limbless_slowdown, movetypes=GROUND)
+		catch
+			movespeed_modification = null
 	else
-		remove_movespeed_modifier(MOVESPEED_ID_LIVING_LIMBLESS, update=TRUE)
+		try
+			remove_movespeed_modifier(MOVESPEED_ID_LIVING_LIMBLESS, update=TRUE)
+		catch
+			movespeed_modification = null
 
 ///Proc to modify the value of num_hands and hook behavior associated to this event.
 /mob/living/proc/set_num_hands(new_value)

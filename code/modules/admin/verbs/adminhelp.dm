@@ -28,7 +28,21 @@ GLOBAL_DATUM_INIT(ahelp_tickets, /datum/admin_help_tickets, new)
 /datum/admin_help_tickets/proc/TicketByID(id)
 	var/list/lists = list(active_tickets, closed_tickets, resolved_tickets)
 	for(var/I in lists)
-		for(var/datum/admin_help/AH as anything in I)
+		if(!islist(I))
+			continue
+		var/ticket_count = 0
+		try
+			ticket_count = length(I)
+		catch
+			continue
+		for(var/ticket_index in 1 to ticket_count)
+			var/datum/admin_help/AH
+			try
+				AH = I[ticket_index]
+			catch
+				continue
+			if(!AH)
+				continue
 			if(AH.id == id)
 				return AH
 
@@ -36,7 +50,21 @@ GLOBAL_DATUM_INIT(ahelp_tickets, /datum/admin_help_tickets, new)
 	. = list()
 	var/list/lists = list(active_tickets, closed_tickets, resolved_tickets)
 	for(var/I in lists)
-		for(var/datum/admin_help/AH as anything in I)
+		if(!islist(I))
+			continue
+		var/ticket_count = 0
+		try
+			ticket_count = length(I)
+		catch
+			continue
+		for(var/ticket_index in 1 to ticket_count)
+			var/datum/admin_help/AH
+			try
+				AH = I[ticket_index]
+			catch
+				continue
+			if(!AH)
+				continue
 			if(AH.initiator_ckey == ckey)
 				. += AH
 
@@ -52,14 +80,53 @@ GLOBAL_DATUM_INIT(ahelp_tickets, /datum/admin_help_tickets, new)
 			ticket_list = resolved_tickets
 		else
 			CRASH("Invalid ticket state: [new_ticket.state]")
-	var/num_closed = ticket_list.len
+	if(!islist(ticket_list))
+		ticket_list = list()
+		switch(new_ticket.state)
+			if(AHELP_ACTIVE)
+				active_tickets = ticket_list
+			if(AHELP_CLOSED)
+				closed_tickets = ticket_list
+			if(AHELP_RESOLVED)
+				resolved_tickets = ticket_list
+	var/num_closed = 0
+	try
+		num_closed = length(ticket_list)
+	catch
+		ticket_list = list()
 	if(num_closed)
 		for(var/I in 1 to num_closed)
-			var/datum/admin_help/AH = ticket_list[I]
+			var/datum/admin_help/AH
+			try
+				AH = ticket_list[I]
+			catch
+				continue
+			if(!AH)
+				continue
 			if(AH.id > new_ticket.id)
-				ticket_list.Insert(I, new_ticket)
+				try
+					ticket_list.Insert(I, new_ticket)
+				catch
+					ticket_list = list(new_ticket)
+					switch(new_ticket.state)
+						if(AHELP_ACTIVE)
+							active_tickets = ticket_list
+						if(AHELP_CLOSED)
+							closed_tickets = ticket_list
+						if(AHELP_RESOLVED)
+							resolved_tickets = ticket_list
 				return
-	ticket_list += new_ticket
+	try
+		ticket_list += new_ticket
+	catch
+		ticket_list = list(new_ticket)
+		switch(new_ticket.state)
+			if(AHELP_ACTIVE)
+				active_tickets = ticket_list
+			if(AHELP_CLOSED)
+				closed_tickets = ticket_list
+			if(AHELP_RESOLVED)
+				resolved_tickets = ticket_list
 
 //opens the ticket listings for one of the 3 states
 /datum/admin_help_tickets/proc/BrowseTickets(state)
@@ -79,7 +146,19 @@ GLOBAL_DATUM_INIT(ahelp_tickets, /datum/admin_help_tickets, new)
 		return
 	var/list/dat = list("<html><head><title>[title]</title></head>")
 	dat += "<A href='?_src_=holder;[HrefToken()];ahelp_tickets=[state]'>Refresh</A><br><br>"
-	for(var/datum/admin_help/AH as anything in l2b)
+	var/ticket_count = 0
+	try
+		ticket_count = length(l2b)
+	catch
+		ticket_count = 0
+	for(var/ticket_index in 1 to ticket_count)
+		var/datum/admin_help/AH
+		try
+			AH = l2b[ticket_index]
+		catch
+			continue
+		if(!AH)
+			continue
 		dat += "<span class='adminnotice'><span class='adminhelp'>Ticket #[AH.id]: <A href='?_src_=holder;[HrefToken()];ahelp=[REF(AH)];ahelp_action=ticket'>[AH.initiator_key_name]: [AH.name]</A></span></span><br>"
 
 	usr << browse(dat.Join(), "window=ahelp_list[state];size=600x480")
@@ -89,9 +168,21 @@ GLOBAL_DATUM_INIT(ahelp_tickets, /datum/admin_help_tickets, new)
 	SHOULD_NOT_SLEEP(TRUE)
 	var/list/L = list()
 	var/num_disconnected = 0
-	L[++L.len] = list("Active Tickets:", "[astatclick.update("[active_tickets.len]")]", null, REF(astatclick))
-	astatclick.update("[active_tickets.len]")
-	for(var/datum/admin_help/AH as anything in active_tickets)
+	var/active_ticket_count = 0
+	try
+		active_ticket_count = length(active_tickets)
+	catch
+		active_tickets = list()
+	L[++L.len] = list("Active Tickets:", "[astatclick.update("[active_ticket_count]")]", null, REF(astatclick))
+	astatclick.update("[active_ticket_count]")
+	for(var/ticket_index in 1 to active_ticket_count)
+		var/datum/admin_help/AH
+		try
+			AH = active_tickets[ticket_index]
+		catch
+			continue
+		if(!AH)
+			continue
 		if(AH.initiator)
 			var/obj/effect/statclick/updated = AH.statclick.update()
 			L[++L.len] = list("#[AH.id]. [AH.initiator_key_name]:", "[updated.name]", REF(AH))
@@ -99,13 +190,27 @@ GLOBAL_DATUM_INIT(ahelp_tickets, /datum/admin_help_tickets, new)
 			++num_disconnected
 	if(num_disconnected)
 		L[++L.len] = list("Disconnected:", "[astatclick.update("[num_disconnected]")]", null, REF(astatclick))
-	L[++L.len] = list("Closed Tickets:", "[cstatclick.update("[closed_tickets.len]")]", null, REF(cstatclick))
-	L[++L.len] = list("Resolved Tickets:", "[rstatclick.update("[resolved_tickets.len]")]", null, REF(rstatclick))
+	var/closed_ticket_count = 0
+	var/resolved_ticket_count = 0
+	try
+		closed_ticket_count = length(closed_tickets)
+	catch
+		closed_tickets = list()
+	try
+		resolved_ticket_count = length(resolved_tickets)
+	catch
+		resolved_tickets = list()
+	L[++L.len] = list("Closed Tickets:", "[cstatclick.update("[closed_ticket_count]")]", null, REF(cstatclick))
+	L[++L.len] = list("Resolved Tickets:", "[rstatclick.update("[resolved_ticket_count]")]", null, REF(rstatclick))
 	return L
 
 //Reassociate still open ticket if one exists
 /datum/admin_help_tickets/proc/ClientLogin(client/C)
-	C.current_ticket = CKey2ActiveTicket(C.ckey)
+	try
+		C.current_ticket = CKey2ActiveTicket(C.ckey)
+	catch
+		active_tickets = list()
+		C.current_ticket = null
 	if(C.current_ticket)
 		C.current_ticket.initiator = C
 		C.current_ticket.AddInteraction("Client reconnected.")
@@ -114,14 +219,32 @@ GLOBAL_DATUM_INIT(ahelp_tickets, /datum/admin_help_tickets, new)
 //Dissasociate ticket
 /datum/admin_help_tickets/proc/ClientLogout(client/C)
 	if(C.current_ticket)
-		SSplexora.aticket_connection(C.current_ticket)
-		C.current_ticket.AddInteraction("Client disconnected.")
+		try
+			SSplexora.aticket_connection(C.current_ticket)
+			C.current_ticket.AddInteraction("Client disconnected.")
+		catch
+			EMPTY_BLOCK_GUARD
 		C.current_ticket.initiator = null
 		C.current_ticket = null
 
 //Get a ticket given a ckey
 /datum/admin_help_tickets/proc/CKey2ActiveTicket(ckey)
-	for(var/datum/admin_help/AH as anything in active_tickets)
+	if(!islist(active_tickets))
+		active_tickets = list()
+	var/active_ticket_count = 0
+	try
+		active_ticket_count = length(active_tickets)
+	catch
+		active_tickets = list()
+		return
+	for(var/ticket_index in 1 to active_ticket_count)
+		var/datum/admin_help/AH
+		try
+			AH = active_tickets[ticket_index]
+		catch
+			continue
+		if(!AH)
+			continue
 		if(AH.initiator_ckey == ckey)
 			return AH
 

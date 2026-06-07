@@ -38,24 +38,46 @@ Key procs
 /mob/proc/add_movespeed_modifier(id, update=TRUE, priority=0, flags=NONE, override=FALSE, multiplicative_slowdown=0, movetypes=ALL, blacklisted_movetypes=NONE, conflict=FALSE)
 	var/list/temp = list(priority, flags, multiplicative_slowdown, movetypes, blacklisted_movetypes, conflict) //build the modification list
 	var/resort = TRUE
-	if(LAZYACCESS(movespeed_modification, id))
-		var/list/existing_data = movespeed_modification[id]
+	var/list/existing_data
+	if(islist(movespeed_modification))
+		try
+			existing_data = movespeed_modification[id]
+		catch
+			movespeed_modification = null
+	if(existing_data)
 		if(movespeed_modifier_identical_check(existing_data, temp))
 			return FALSE
 		if(!override)
 			return FALSE
 		if(priority == existing_data[MOVESPEED_DATA_INDEX_PRIORITY])
 			resort = FALSE // We don't need to re-sort if we're replacing something already there and it's the same priority
-	LAZYSET(movespeed_modification, id, temp)
+	if(!islist(movespeed_modification))
+		movespeed_modification = list()
+	try
+		movespeed_modification[id] = temp
+	catch
+		movespeed_modification = list()
+		movespeed_modification[id] = temp
 	if(update)
 		update_movespeed(resort)
 	return TRUE
 
 ///Remove a move speed modifier from a mob
 /mob/proc/remove_movespeed_modifier(id, update = TRUE)
-	if(!LAZYACCESS(movespeed_modification, id))
+	if(!islist(movespeed_modification))
 		return FALSE
-	LAZYREMOVE(movespeed_modification, id)
+	var/has_modifier = FALSE
+	try
+		has_modifier = !isnull(movespeed_modification[id])
+	catch
+		movespeed_modification = null
+		return FALSE
+	if(!has_modifier)
+		return FALSE
+	try
+		movespeed_modification -= id
+	catch
+		movespeed_modification = null
 	UNSETEMPTY(movespeed_modification)
 	if(update)
 		update_movespeed(FALSE)
@@ -74,27 +96,58 @@ Key procs
 
 ///Is there a movespeed modifier for this mob
 /mob/proc/has_movespeed_modifier(id)
-	return LAZYACCESS(movespeed_modification, id)
+	if(!islist(movespeed_modification))
+		return FALSE
+	try
+		return !isnull(movespeed_modification[id])
+	catch
+		movespeed_modification = null
+		return FALSE
 
 ///Set or update the global movespeed config on a mob
 /mob/proc/update_config_movespeed()
-	add_movespeed_modifier(MOVESPEED_ID_CONFIG_SPEEDMOD, FALSE, 100, override = TRUE, multiplicative_slowdown = get_config_multiplicative_speed())
+	try
+		add_movespeed_modifier(MOVESPEED_ID_CONFIG_SPEEDMOD, FALSE, 100, override = TRUE, multiplicative_slowdown = get_config_multiplicative_speed())
+	catch
+		movespeed_modification = null
 
 ///Get the global config movespeed of a mob by type
 /mob/proc/get_config_multiplicative_speed()
-	if(!islist(GLOB.mob_config_movespeed_type_lookup) || !GLOB.mob_config_movespeed_type_lookup[type])
+	if(!islist(GLOB.mob_config_movespeed_type_lookup))
 		return 0
-	else
-		return GLOB.mob_config_movespeed_type_lookup[type]
+	try
+		return GLOB.mob_config_movespeed_type_lookup[type] || 0
+	catch
+		GLOB.mob_config_movespeed_type_lookup = list()
+		return 0
 
 ///Go through the list of movespeed modifiers and calculate a final movespeed
 /mob/proc/update_movespeed(resort = TRUE)
 	if(resort)
 		sort_movespeed_modlist()
 	. = 0
+	if(!islist(movespeed_modification))
+		cached_multiplicative_slowdown = 0
+		return
 	var/list/conflict_tracker = list()
-	for(var/id in get_movespeed_modifiers())
-		var/list/data = movespeed_modification[id]
+	var/list/modifiers = get_movespeed_modifiers()
+	var/modifier_count = 0
+	try
+		modifier_count = length(modifiers)
+	catch
+		movespeed_modification = null
+		cached_multiplicative_slowdown = 0
+		return
+	for(var/modifier_index in 1 to modifier_count)
+		var/id
+		var/list/data
+		try
+			id = modifiers[modifier_index]
+			data = movespeed_modification[id]
+		catch
+			continue
+		if(!islist(data))
+			continue
 		if(!(data[MOVESPEED_DATA_INDEX_MOVETYPE] & movement_type)) // We don't affect any of these move types, skip
 			continue
 		if(data[MOVESPEED_DATA_INDEX_BL_MOVETYPE] & movement_type) // There's a movetype here that disables this modifier, skip
@@ -116,29 +169,58 @@ Key procs
 
 ///Get the move speed modifiers list of the mob
 /mob/proc/get_movespeed_modifiers()
+	if(!islist(movespeed_modification))
+		return list()
 	return movespeed_modification
 
 ///Check if a movespeed modifier is identical to another
 /mob/proc/movespeed_modifier_identical_check(list/mod1, list/mod2)
-	if(!islist(mod1) || !islist(mod2) || mod1.len < MOVESPEED_DATA_INDEX_MAX || mod2.len < MOVESPEED_DATA_INDEX_MAX)
+	var/mod1_length = 0
+	var/mod2_length = 0
+	try
+		mod1_length = length(mod1)
+		mod2_length = length(mod2)
+	catch
 		return FALSE
-	for(var/i in 1 to MOVESPEED_DATA_INDEX_MAX)
-		if(mod1[i] != mod2[i])
-			return FALSE
+	if(!islist(mod1) || !islist(mod2) || mod1_length < MOVESPEED_DATA_INDEX_MAX || mod2_length < MOVESPEED_DATA_INDEX_MAX)
+		return FALSE
+	try
+		for(var/i in 1 to MOVESPEED_DATA_INDEX_MAX)
+			if(mod1[i] != mod2[i])
+				return FALSE
+	catch
+		return FALSE
 	return TRUE
 
 ///Calculate the total slowdown of all movespeed modifiers
 /mob/proc/total_multiplicative_slowdown()
 	. = 0
-	for(var/id in get_movespeed_modifiers())
-		var/list/data = movespeed_modification[id]
+	var/list/modifiers = get_movespeed_modifiers()
+	var/modifier_count = 0
+	try
+		modifier_count = length(modifiers)
+	catch
+		return
+	for(var/modifier_index in 1 to modifier_count)
+		var/id
+		var/list/data
+		try
+			id = modifiers[modifier_index]
+			data = movespeed_modification[id]
+		catch
+			continue
+		if(!islist(data))
+			continue
 		. += data[MOVESPEED_DATA_INDEX_MULTIPLICATIVE_SLOWDOWN]
 
 ///Checks if a move speed modifier is valid and not missing any data
 /proc/movespeed_data_null_check(list/data)		//Determines if a data list is not meaningful and should be discarded.
 	. = TRUE
-	if(data[MOVESPEED_DATA_INDEX_MULTIPLICATIVE_SLOWDOWN])
-		. = FALSE
+	try
+		if(data[MOVESPEED_DATA_INDEX_MULTIPLICATIVE_SLOWDOWN])
+			. = FALSE
+	catch
+		return TRUE
 
 /**
  * Sort the list of move speed modifiers
@@ -146,17 +228,35 @@ Key procs
  * Verifies it too. Sorts highest priority (first applied) to lowest priority (last applied)
  */
 /mob/proc/sort_movespeed_modlist()
-	if(!movespeed_modification)
+	if(!islist(movespeed_modification))
 		return
 	var/list/assembled = list()
-	for(var/our_id in movespeed_modification)
-		var/list/our_data = movespeed_modification[our_id]
-		if(!islist(our_data) || (our_data.len < MOVESPEED_DATA_INDEX_PRIORITY) || movespeed_data_null_check(our_data))
-			movespeed_modification -= our_id
+	var/modifier_count = 0
+	try
+		modifier_count = length(movespeed_modification)
+	catch
+		movespeed_modification = null
+		return
+	for(var/modifier_index in 1 to modifier_count)
+		var/our_id
+		var/list/our_data
+		try
+			our_id = movespeed_modification[modifier_index]
+			our_data = movespeed_modification[our_id]
+		catch
+			continue
+		var/our_data_length = 0
+		try
+			our_data_length = length(our_data)
+		catch
+			continue
+		if(!islist(our_data) || (our_data_length < MOVESPEED_DATA_INDEX_PRIORITY) || movespeed_data_null_check(our_data))
 			continue
 		var/our_priority = our_data[MOVESPEED_DATA_INDEX_PRIORITY]
 		var/resolved = FALSE
-		for(var/their_id in assembled)
+		var/assembled_count = length(assembled)
+		for(var/assembled_index in 1 to assembled_count)
+			var/their_id = assembled[assembled_index]
 			var/list/their_data = assembled[their_id]
 			if(their_data[MOVESPEED_DATA_INDEX_PRIORITY] < our_priority)
 				assembled.Insert(assembled.Find(their_id), our_id)

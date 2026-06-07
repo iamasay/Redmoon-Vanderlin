@@ -123,10 +123,25 @@ SUBSYSTEM_DEF(triumphs)
 
 	prep_the_triumphs_leaderboard()
 
-	for(var/client/client as anything in pending_clients_seasonal)
+	if(!islist(pending_clients_seasonal))
+		pending_clients_seasonal = list()
+	var/pending_client_count = 0
+	try
+		pending_client_count = length(pending_clients_seasonal)
+	catch
+		pending_client_count = 0
+	for(var/pending_index in 1 to pending_client_count)
+		var/client/client
+		try
+			client = pending_clients_seasonal[pending_index]
+		catch
+			continue
 		if(QDELETED(client))
 			continue
-		activate_seasonal_buys(client)
+		try
+			activate_seasonal_buys(client)
+		catch
+			continue
 
 	pending_clients_seasonal = null
 
@@ -310,10 +325,19 @@ SUBSYSTEM_DEF(triumphs)
 	if(!target_ckey)
 		return 0
 
-	if(target_ckey in triumph_amount_cache)
-		return floor(triumph_amount_cache[target_ckey])
+	if(!islist(triumph_amount_cache))
+		triumph_amount_cache = list()
+	try
+		if(target_ckey in triumph_amount_cache)
+			return floor(triumph_amount_cache[target_ckey])
+	catch
+		triumph_amount_cache = list()
 
-	triumph_amount_cache[target_ckey] = 0
+	try
+		triumph_amount_cache[target_ckey] = 0
+	catch
+		triumph_amount_cache = list()
+		triumph_amount_cache[target_ckey] = 0
 
 	var/target_file = file("data/player_saves/[target_ckey[1]]/[target_ckey]/triumphs.json")
 
@@ -321,13 +345,24 @@ SUBSYSTEM_DEF(triumphs)
 		reset_or_create_data(target_ckey)
 		return 0
 
-	var/list/existing_data = json_decode(file2text(target_file))
+	var/list/existing_data = list()
+	try
+		existing_data = json_decode(file2text(target_file))
+		if(!islist(existing_data))
+			existing_data = list()
+	catch
+		existing_data = list()
 	if(GLOB.triumph_wipe_season != existing_data[TRIUMPH_KEY_SEASON])
 		write_save(target_file, list(TRIUMPH_KEY_SEASON = GLOB.triumph_wipe_season))
 		return 0
 
-	triumph_amount_cache[target_ckey] = existing_data[TRIUMPH_KEY_AMOUNT]
-	return floor(triumph_amount_cache[target_ckey])
+	var/current_amount = 0
+	try
+		current_amount = text2num("[existing_data[TRIUMPH_KEY_AMOUNT]]")
+	catch
+		current_amount = 0
+	triumph_amount_cache[target_ckey] = current_amount
+	return floor(current_amount)
 
 /// Write triumphs to player save
 /datum/controller/subsystem/triumphs/proc/write_player_triumphs(target_ckey, amount)
@@ -368,20 +403,40 @@ SUBSYSTEM_DEF(triumphs)
 		reset_or_create_data(target_ckey)
 		return
 
-	var/list/data = json_decode(file2text(target_file))
+	var/list/data = list()
+	try
+		data = json_decode(file2text(target_file))
+		if(!islist(data))
+			data = list()
+	catch
+		data = list()
 
 	var/list/buy_ids = data[TRIUMPH_KEY_SEASONAL_BUYS]
 
-	if(!length(buy_ids))
+	if(!islist(buy_ids) || !length(buy_ids))
 		return
 
 	var/list/returned_types = list()
 
-	for(var/id in buy_ids)
-		var/datum/triumph_buy/seasonal/triumph_type = GLOB.triumph_buys_by_id[id]
+	var/buy_id_count = 0
+	try
+		buy_id_count = length(buy_ids)
+	catch
+		buy_id_count = 0
+	for(var/buy_id_index in 1 to buy_id_count)
+		var/id
+		var/datum/triumph_buy/seasonal/triumph_type
+		try
+			id = buy_ids[buy_id_index]
+			triumph_type = GLOB.triumph_buys_by_id[id]
+		catch
+			continue
 
-		if(!triumph_type || check_seasonal_expiry(triumph_type, buy_ids[id]))
-			remove_seasonal_triumph_buy(target_ckey, id)
+		try
+			if(!triumph_type || check_seasonal_expiry(triumph_type, buy_ids[id]))
+				remove_seasonal_triumph_buy(target_ckey, id)
+				continue
+		catch
 			continue
 
 		returned_types += triumph_type
@@ -453,26 +508,54 @@ SUBSYSTEM_DEF(triumphs)
 
 	var/ckey_index = client.ckey
 
+	if(!islist(activated_seasonal_ckeys))
+		activated_seasonal_ckeys = list()
 	if(activated_seasonal_ckeys[ckey_index])
 		return
 
 	var/list/triumph_types = get_seasonal_triumph_buys(ckey_index)
 
-	if(!length(triumph_types))
+	if(!islist(triumph_types) || !length(triumph_types))
 		return
 
-	for(var/triumph_type in triumph_types)
-		var/datum/triumph_buy/seasonal/new_buy = new triumph_type()
+	var/triumph_type_count = 0
+	try
+		triumph_type_count = length(triumph_types)
+	catch
+		triumph_type_count = 0
+	for(var/triumph_type_index in 1 to triumph_type_count)
+		var/triumph_type
+		try
+			triumph_type = triumph_types[triumph_type_index]
+		catch
+			continue
+		var/datum/triumph_buy/seasonal/new_buy
+		try
+			new_buy = new triumph_type()
+		catch
+			continue
 
 		new_buy.ckey_of_buyer = ckey_index
 
 		// Do not activate or on_buy seasonal triumph buy after initial purchase
 
-		new_buy.on_reloaded()
+		try
+			new_buy.on_reloaded()
+		catch
+			EMPTY_BLOCK_GUARD
 
-		LAZYADDASSOCLIST(triumph_buy_owners, ckey_index, new_buy)
+		try
+			LAZYADDASSOCLIST(triumph_buy_owners, ckey_index, new_buy)
+		catch
+			if(!islist(triumph_buy_owners))
+				triumph_buy_owners = list()
+			triumph_buy_owners[ckey_index] = list(new_buy)
 
-		LAZYSET(activated_seasonal_ckeys, ckey_index, TRUE)
+		try
+			LAZYSET(activated_seasonal_ckeys, ckey_index, TRUE)
+		catch
+			activated_seasonal_ckeys = list()
+			activated_seasonal_ckeys[ckey_index] = TRUE
 
 /// Wipe the triumphs of one person
 /datum/controller/subsystem/triumphs/proc/wipe_target_triumphs(target_ckey)

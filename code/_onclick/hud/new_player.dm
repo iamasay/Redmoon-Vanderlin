@@ -7,26 +7,25 @@
 	var/list/shown_station_trait_buttons
 
 /datum/hud/new_player/New(mob/owner)
+	if(!owner?.client)
+		return
+
+	. = ..()
 
 	scannies = new /atom/movable/screen/scannies(null, src)
 	static_inventory += scannies
 	if(owner.client?.prefs?.crt == TRUE)
 		scannies.alpha = 70
 
-	if (!owner?.client)
-		return
-
 	var/list/buttons = subtypesof(/atom/movable/screen/lobby)
-	for (var/atom/movable/screen/lobby/lobbyscreen as anything in buttons)
-		if (!initial(lobbyscreen.always_available))
+	for(var/atom/movable/screen/lobby/lobbyscreen as anything in buttons)
+		if(!initial(lobbyscreen.always_available))
 			continue
 		lobbyscreen = new lobbyscreen(null, src)
 		static_inventory += lobbyscreen
-		if (!lobbyscreen.always_shown)
+		if(!lobbyscreen.always_shown)
 			lobbyscreen.RegisterSignal(src, COMSIG_HUD_LOBBY_COLLAPSED, TYPE_PROC_REF(/atom/movable/screen/lobby, collapse_button))
 			lobbyscreen.RegisterSignal(src, COMSIG_HUD_LOBBY_EXPANDED, TYPE_PROC_REF(/atom/movable/screen/lobby, expand_button))
-
-	. = ..()
 
 //copypaste begin
 
@@ -85,7 +84,8 @@ INITIALIZE_IMMEDIATE(/atom/movable/screen/lobby)
 
 	flick("[base_icon_state]_pressed", src)
 	if(select_sound_play)
-		hud.mymob.playsound_local(soundin = 'sound/menu/button_press.ogg', vol = 50, vary = TRUE)
+		var/mob/sound_mob = hud?.mymob || usr
+		sound_mob?.playsound_local(soundin = 'sound/menu/button_press.ogg', vol = 50, vary = TRUE)
 	return TRUE
 
 /atom/movable/screen/lobby/button/MouseEntered(location, control, params)
@@ -151,7 +151,8 @@ INITIALIZE_IMMEDIATE(/atom/movable/screen/lobby)
 	if(!.)
 		return
 
-	hud.mymob.client?.setup_character()
+	var/mob/owner = hud?.mymob || usr
+	owner.client?.setup_character()
 
 /atom/movable/screen/lobby/button/character_setup/proc/enable_character_setup()
 	SIGNAL_HANDLER
@@ -195,7 +196,9 @@ INITIALIZE_IMMEDIATE(/atom/movable/screen/lobby)
 	. = ..()
 	if(!.)
 		return
-	var/mob/dead/new_player/new_player = hud.mymob
+	var/mob/dead/new_player/new_player = hud?.mymob || usr
+	if(!istype(new_player))
+		return
 	ready = !ready
 	if(ready)
 		new_player.ready = PLAYER_READY_TO_PLAY

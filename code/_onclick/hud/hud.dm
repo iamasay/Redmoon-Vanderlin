@@ -9,7 +9,18 @@ GLOBAL_LIST_INIT(available_ui_styles, sortList(list(
 	"Rogue" = 'icons/mob/roguehud.dmi')))
 
 /proc/ui_style2icon(ui_style)
-	return GLOB.available_ui_styles[ui_style] || GLOB.available_ui_styles[GLOB.available_ui_styles[1]]
+	var/static/default_ui_icon = 'icons/mob/roguehud.dmi'
+	try
+		if(!islist(GLOB.available_ui_styles) || !length(GLOB.available_ui_styles))
+			return default_ui_icon
+		var/ui_icon = GLOB.available_ui_styles[ui_style]
+		if(ui_icon)
+			return ui_icon
+		var/default_ui_key = GLOB.available_ui_styles[1]
+		var/default_icon = GLOB.available_ui_styles[default_ui_key]
+		return default_icon || default_ui_icon
+	catch
+		return default_ui_icon
 
 /datum/hud
 	var/mob/mymob
@@ -91,6 +102,20 @@ GLOBAL_LIST_INIT(available_ui_styles, sortList(list(
 
 /datum/hud/New(mob/owner)
 	mymob = owner
+	if(!islist(static_inventory))
+		static_inventory = list()
+	if(!islist(toggleable_inventory))
+		toggleable_inventory = list()
+	if(!islist(hotkeybuttons))
+		hotkeybuttons = list()
+	if(!islist(infodisplay))
+		infodisplay = list()
+	if(!islist(screenoverlays))
+		screenoverlays = list()
+	if(!islist(plane_masters))
+		plane_masters = list()
+	if(!islist(plane_master_controllers))
+		plane_master_controllers = list()
 
 	if (!ui_style)
 		// will fall back to the default if any of these are null
@@ -105,28 +130,54 @@ GLOBAL_LIST_INIT(available_ui_styles, sortList(list(
 	vis_holder = new(null, src)
 
 	toggle_palette = new()
-	toggle_palette.set_hud(src)
+	try
+		toggle_palette.set_hud(src)
+	catch
+		EMPTY_BLOCK_GUARD
 	palette_down = new()
-	palette_down.set_hud(src)
+	try
+		palette_down.set_hud(src)
+	catch
+		EMPTY_BLOCK_GUARD
 	palette_up = new()
-	palette_up.set_hud(src)
+	try
+		palette_up.set_hud(src)
+	catch
+		EMPTY_BLOCK_GUARD
 
 	if(!hand_slots)
 		hand_slots = list()
 	else
-		hand_slots.Cut()
+		try
+			if(islist(hand_slots))
+				hand_slots.Cut()
+			else
+				hand_slots = list()
+		catch
+			hand_slots = list()
 
 	mouse_over_text = new(null, src)
-	static_inventory += mouse_over_text
+	try
+		static_inventory += mouse_over_text
+	catch
+		static_inventory = list(mouse_over_text)
 
 	for(var/mytype in subtypesof(/atom/movable/screen/plane_master))
-		var/atom/movable/screen/plane_master/instance = new mytype()
-		plane_masters["[instance.plane]"] = instance
-		instance.backdrop(mymob)
+		var/atom/movable/screen/plane_master/instance
+		try
+			instance = new mytype()
+			plane_masters["[instance.plane]"] = instance
+			instance.backdrop(mymob)
+		catch
+			continue
 
 	for(var/mytype in subtypesof(/atom/movable/plane_master_controller))
-		var/atom/movable/plane_master_controller/controller_instance = new mytype(null, src)
-		plane_master_controllers[controller_instance.name] = controller_instance
+		var/atom/movable/plane_master_controller/controller_instance
+		try
+			controller_instance = new mytype(null, src)
+			plane_master_controllers[controller_instance.name] = controller_instance
+		catch
+			continue
 
 /datum/hud/Destroy()
 	if(mymob.hud_used == src)

@@ -87,6 +87,7 @@ GLOBAL_LIST_INIT(interaction_speeds, list(
 #define INTERACTION_NORMAL 0
 #define INTERACTION_LEWD 1
 #define INTERACTION_EXTREME 2
+#define INTERACTION_UNHOLY 3
 
 #define CUM_TARGET_MOUTH "mouth"
 #define CUM_TARGET_THROAT "throat"

@@ -60,11 +60,22 @@ GLOBAL_VAR_INIT(total_runtimes_skipped, 0)
 												If negative, starts at -1, and goes down by 1 each time that error gets skipped*/
 
 	if(!error_last_seen) // A runtime is occurring too early in start-up initialization
-		return ..()
+		log_runtime_failsafe(E, caller)
+		return
+
+	if(!islist(error_last_seen) || !islist(error_cooldown))
+		log_runtime_failsafe(E, caller)
+		return
 
 	var/erroruid = "[E.file][E.line]"
-	var/last_seen = error_last_seen[erroruid]
-	var/cooldown = error_cooldown[erroruid] || 0
+	var/last_seen
+	var/cooldown
+	try
+		last_seen = error_last_seen[erroruid]
+		cooldown = error_cooldown[erroruid] || 0
+	catch
+		log_runtime_failsafe(E, caller)
+		return
 
 	if(last_seen == null)
 		error_last_seen[erroruid] = world.time
@@ -82,17 +93,20 @@ GLOBAL_VAR_INIT(total_runtimes_skipped, 0)
 	var/configured_error_cooldown
 	var/configured_error_limit
 	var/configured_error_silence_time
-	if(config && config.entries)
-		configured_error_cooldown = CONFIG_GET(number/error_cooldown)
-		configured_error_limit = CONFIG_GET(number/error_limit)
-		configured_error_silence_time = CONFIG_GET(number/error_silence_time)
-	else
-		var/datum/config_entry/CE = /datum/config_entry/number/error_cooldown
-		configured_error_cooldown = initial(CE.config_entry_value)
-		CE = /datum/config_entry/number/error_limit
-		configured_error_limit = initial(CE.config_entry_value)
-		CE = /datum/config_entry/number/error_silence_time
-		configured_error_silence_time = initial(CE.config_entry_value)
+	var/datum/config_entry/CE = /datum/config_entry/number/error_cooldown
+	configured_error_cooldown = initial(CE.config_entry_value)
+	CE = /datum/config_entry/number/error_limit
+	configured_error_limit = initial(CE.config_entry_value)
+	CE = /datum/config_entry/number/error_silence_time
+	configured_error_silence_time = initial(CE.config_entry_value)
+	try
+		if(config && islist(config.entries_by_type))
+			configured_error_cooldown = CONFIG_GET(number/error_cooldown)
+			configured_error_limit = CONFIG_GET(number/error_limit)
+			configured_error_silence_time = CONFIG_GET(number/error_silence_time)
+	catch
+		// Runtime handling must not depend on config being fully constructed.
+		EMPTY_BLOCK_GUARD
 
 
 	//Each occurence of a unique error adds to its cooldown time...
@@ -169,10 +183,28 @@ GLOBAL_VAR_INIT(total_runtimes_skipped, 0)
 	if(locinfo)
 		extra_data["user_location"] = locinfo
 
-	send_to_glitchtip(E, extra_data)
+	try
+		send_to_glitchtip(E, extra_data)
+	catch
+		EMPTY_BLOCK_GUARD
 #endif
 
 #undef ERROR_USEFUL_LEN
+
+/proc/log_runtime_failsafe(exception/E, callee/stack_entry)
+	#ifndef SPACEMAN_DMM
+	SEND_TEXT(world.log, "\[[time2text(world.timeofday,"hh:mm:ss")]\] Runtime Error: [E.name]")
+	if(E.desc)
+		SEND_TEXT(world.log, E.desc)
+	var/frame_count = 0
+	try
+		while(stack_entry && frame_count < 25)
+			SEND_TEXT(world.log, "  at [stack_entry.proc]")
+			stack_entry = stack_entry.caller
+			frame_count++
+	catch
+		SEND_TEXT(world.log, "  (failed to render runtime stack)")
+	#endif
 
 
 /datum/config_entry/string/glitchtip_dsn
@@ -192,9 +224,15 @@ GLOBAL_VAR_INIT(total_runtimes_skipped, 0)
 /proc/send_to_glitchtip(exception/E, list/extra_data = null)
 	#ifndef SPACEMAN_DMM
 	#ifndef OPENDREAM
-	if(!CONFIG_GET(string/glitchtip_dsn))
+	var/glitchtip_dsn
+	try
+		if(!config || !islist(config.entries_by_type))
+			return
+		glitchtip_dsn = CONFIG_GET(string/glitchtip_dsn)
+	catch
 		return
-	var/glitchtip_dsn = CONFIG_GET(string/glitchtip_dsn)
+	if(!glitchtip_dsn)
+		return
 	//! Parse DSN to extract components
 	//! Format: https://key@host/project_id
 	var/dsn_clean = replacetext(glitchtip_dsn, "https://", "")
@@ -214,7 +252,12 @@ GLOBAL_VAR_INIT(total_runtimes_skipped, 0)
 	event_data["level"] = "error"
 	event_data["platform"] = "other"
 	event_data["server_name"] = world.name
-	event_data["environment"] = CONFIG_GET(string/glitchtip_environment)
+	var/glitchtip_environment = "production"
+	try
+		glitchtip_environment = CONFIG_GET(string/glitchtip_environment)
+	catch
+		EMPTY_BLOCK_GUARD
+	event_data["environment"] = glitchtip_environment
 
 	//! SDK information
 	event_data["sdk"] = list(

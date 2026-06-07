@@ -1,7 +1,18 @@
 /atom/MouseEntered(location, control, params)
-	SSmouse_entered.hovers[usr.client] = src
+	if(usr?.client)
+		try
+			if(!islist(SSmouse_entered.hovers))
+				SSmouse_entered.hovers = list()
+			SSmouse_entered.hovers[usr.client] = src
+		catch
+			SSmouse_entered.hovers = list()
 	if(!no_over_text)
-		INVOKE_ASYNC(src, PROC_REF(create_over_text), usr, params2list(params))
+		var/list/modifiers = list()
+		try
+			modifiers = params2list(params)
+		catch
+			modifiers = list()
+		INVOKE_ASYNC(src, PROC_REF(create_over_text), usr, modifiers)
 
 /// Fired whenever this atom is the most recent to be hovered over in the tick.
 /// Preferred over MouseEntered if you do not need information such as the position of the mouse.

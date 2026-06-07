@@ -25,23 +25,80 @@ GLOBAL_VAR_INIT(mobids, 1)
  * Returns QDEL_HINT_HARDDEL (don't change this)
  */
 /mob/Destroy()//This makes sure that mobs with clients/keys are not just deleted from the game.
-	GLOB.mob_list -= src
-	GLOB.dead_mob_list -= src
-	GLOB.alive_mob_list -= src
-	GLOB.mob_directory -= tag
+	try
+		if(islist(GLOB.mob_list))
+			GLOB.mob_list -= src
+	catch
+		GLOB.mob_list = list()
+	try
+		if(islist(GLOB.dead_mob_list))
+			GLOB.dead_mob_list -= src
+	catch
+		GLOB.dead_mob_list = list()
+	try
+		if(islist(GLOB.alive_mob_list))
+			GLOB.alive_mob_list -= src
+	catch
+		GLOB.alive_mob_list = list()
+	try
+		if(islist(GLOB.mob_directory))
+			GLOB.mob_directory -= tag
+	catch
+		GLOB.mob_directory = list()
 	focus = null
 
-	for (var/alert in alerts)
-		clear_alert(alert, TRUE)
-	if(observers && observers.len)
-		for(var/mob/dead/observe as anything in observers)
-			observe.reset_perspective(null)
-	qdel(hud_used)
-	for(var/cc in client_colours)
-		qdel(cc)
+	if(islist(alerts))
+		var/alert_count = 0
+		try
+			alert_count = length(alerts)
+		catch
+			alert_count = 0
+		for(var/alert_index in 1 to alert_count)
+			var/alert
+			try
+				alert = alerts[alert_index]
+				clear_alert(alert, TRUE)
+			catch
+				continue
+	var/observer_count = 0
+	try
+		observer_count = islist(observers) ? length(observers) : 0
+	catch
+		observer_count = 0
+	if(observer_count)
+		for(var/observer_index in 1 to observer_count)
+			var/mob/dead/observe
+			try
+				observe = observers[observer_index]
+				observe?.reset_perspective(null)
+			catch
+				continue
+	try
+		qdel(hud_used)
+	catch
+		EMPTY_BLOCK_GUARD
+	if(islist(client_colours))
+		var/colour_count = 0
+		try
+			colour_count = length(client_colours)
+		catch
+			colour_count = 0
+		for(var/colour_index in 1 to colour_count)
+			var/cc
+			try
+				cc = client_colours[colour_index]
+				qdel(cc)
+			catch
+				continue
 	client_colours = null
-	ghostize(drawskip=TRUE)
-	..()
+	try
+		ghostize(drawskip=TRUE)
+	catch
+		EMPTY_BLOCK_GUARD
+	try
+		..()
+	catch
+		EMPTY_BLOCK_GUARD
 	return QDEL_HINT_HARDDEL
 
 /// Assigns a (c)key to this mob.
@@ -1088,7 +1145,12 @@ GLOBAL_VAR_INIT(mobids, 1)
 	if(client.mouse_pointer_icon != initial(client.mouse_pointer_icon))//only send changes to the client if theyre needed
 		client.mouse_pointer_icon = 'icons/effects/mousemice/human.dmi'
 	if(!client.charging && !atkswinging)
-		if(examine_cursor_icon && client.keys_held["Shift"]) //mouse shit is hardcoded, make this non hard-coded once we make mouse modifiers bindable
+		var/shift_held = FALSE
+		try
+			shift_held = islist(client.keys_held) && client.keys_held["Shift"]
+		catch
+			client.keys_held = list()
+		if(examine_cursor_icon && shift_held) //mouse shit is hardcoded, make this non hard-coded once we make mouse modifiers bindable
 			client.mouse_pointer_icon = examine_cursor_icon
 	if(client.mouse_override_icon)
 		client.mouse_pointer_icon = client.mouse_override_icon

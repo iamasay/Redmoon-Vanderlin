@@ -44,20 +44,35 @@
 	if(!pref_species)
 		return
 	var/list/customizers = pref_species.customizers
-	if(!customizers)
+	if(!islist(customizers) || !length(customizers))
 		return
 	dat += "<table width='100%'>"
 	dat += "<td valign='top' width='33%'>"
 	var/iterated_customizers = 0
-	for(var/customizer_type in customizers)
-		var/datum/customizer/customizer = CUSTOMIZER(customizer_type)
-		if(!customizer.is_allowed(src))
+	var/customizer_count = 0
+	try
+		customizer_count = length(customizers)
+	catch
+		customizer_count = 0
+	for(var/customizer_index in 1 to customizer_count)
+		var/customizer_type
+		var/datum/customizer/customizer
+		var/datum/customizer_entry/entry
+		var/datum/customizer_choice/choice
+		try
+			customizer_type = customizers[customizer_index]
+			customizer = CUSTOMIZER(customizer_type)
+			if(!customizer?.is_allowed(src))
+				continue
+			entry = get_customizer_entry_for_customizer_type(customizer_type)
+			if(!entry)
+				stack_trace("Missing customizer entry in preferences for customizer [customizer_type]")
+				continue
+			choice = CUSTOMIZER_CHOICE(entry.customizer_choice_type)
+		catch
 			continue
-		var/datum/customizer_entry/entry = get_customizer_entry_for_customizer_type(customizer_type)
-		if(!entry)
-			stack_trace("Missing customizer entry in preferences for customizer [customizer_type]")
+		if(!choice)
 			continue
-		var/datum/customizer_choice/choice = CUSTOMIZER_CHOICE(entry.customizer_choice_type)
 
 		var/customizer_link
 
@@ -73,14 +88,23 @@
 		dat += "<a [customizer_link]>[customizer.name]</a>"
 		if(!entry.disabled)
 			var/choice_link
-			if(length(customizer.customizer_choices) > 1)
+			var/choice_count = 0
+			try
+				choice_count = islist(customizer.customizer_choices) ? length(customizer.customizer_choices) : 0
+			catch
+				choice_count = 0
+			if(choice_count > 1)
 				choice_link = "href='?_src_=prefs;task=change_customizer;customizer=[customizer_type];customizer_task=change_choice'"
 			else
 				choice_link = "class='linkOff'"
-			if(length(customizer.customizer_choices) > 1)
+			if(choice_count > 1)
 				dat += "<br><a [choice_link]>[choice.name]</a>"
 
-			var/list/choice_list = choice.show_pref_choices(src, entry, customizer_type)
+			var/list/choice_list
+			try
+				choice_list = choice.show_pref_choices(src, entry, customizer_type)
+			catch
+				choice_list = null
 			if(choice_list)
 				dat += choice_list
 
@@ -179,8 +203,22 @@
 /datum/preferences/proc/ShowCustomizers(mob/user)
 	var/list/dat = list()
 	dat += "<style>span.color_holder_box{display: inline-block; width: 20px; height: 8px; border:1px solid #000; padding: 0px;}</style>"
-	dat += print_customizers_page()
-	var/datum/browser/popup = new(user, "customization", "<div align='center'>Customization</div>", 630, 730)
+	try
+		dat += build_consent_preferences_html()
+	catch
+		EMPTY_BLOCK_GUARD
+	dat += "<br><hr><br>"
+	var/list/customizer_page = null
+	try
+		customizer_page = print_customizers_page()
+	catch
+		customizer_page = null
+	if(islist(customizer_page))
+		try
+			dat += customizer_page.Join()
+		catch
+			EMPTY_BLOCK_GUARD
+	var/datum/browser/popup = new(user, "customization", "<div align='center'>Customization</div>", 650, 850)
 	popup.set_content(dat.Join())
 	popup.open(use_onclose = FALSE)
 

@@ -536,18 +536,40 @@ GLOBAL_LIST_EMPTY(chronicle_stats)
 /proc/record_round_statistic(name, amount = 1)
 	if(SSticker.current_state == GAME_STATE_FINISHED)
 		return
-	if(!name || isnull(GLOB.vanderlin_round_stats[name]))
+	if(!name)
 		return
-
-	GLOB.vanderlin_round_stats[name] += amount
+	if(!islist(GLOB.vanderlin_round_stats))
+		GLOB.vanderlin_round_stats = list()
+	var/current_value
+	try
+		current_value = GLOB.vanderlin_round_stats[name]
+	catch
+		GLOB.vanderlin_round_stats = list()
+		GLOB.vanderlin_round_stats[name] = amount
+		return
+	if(isnull(current_value))
+		GLOB.vanderlin_round_stats[name] = amount
+		return
+	GLOB.vanderlin_round_stats[name] = current_value + amount
 
 /// Force set a value of a specific round statistic to a given value
 /proc/force_set_round_statistic(name, value)
 	if(SSticker.current_state == GAME_STATE_FINISHED)
 		return
-	if(!name || isnull(GLOB.vanderlin_round_stats[name]))
+	if(!name)
 		return
-
+	if(!islist(GLOB.vanderlin_round_stats))
+		GLOB.vanderlin_round_stats = list()
+	var/current_value
+	try
+		current_value = GLOB.vanderlin_round_stats[name]
+	catch
+		GLOB.vanderlin_round_stats = list()
+		GLOB.vanderlin_round_stats[name] = value
+		return
+	if(isnull(current_value))
+		GLOB.vanderlin_round_stats[name] = value
+		return
 	GLOB.vanderlin_round_stats[name] = value
 
 /proc/format_top_stats(stat_category)

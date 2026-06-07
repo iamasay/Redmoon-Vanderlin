@@ -33,25 +33,91 @@
 
 /// called upon job datum creation. Override this proc to change.
 /datum/map_adjustment/proc/job_change()
-	for(var/job as anything in blacklist)
-		change_job_position(job, 0)
-		var/datum/job/J = SSjob.GetJobType(job)
-		J?.job_flags &= ~(JOB_NEW_PLAYER_JOINABLE)
-	for(var/job as anything in slot_adjust)
-		change_job_position(job, slot_adjust[job])
-	for(var/job as anything in species_adjust)
-		var/datum/job/J = SSjob.GetJobType(job)
-		J?.allowed_races = species_adjust[job]
-	for(var/job as anything in sexes_adjust)
-		var/datum/job/J = SSjob.GetJobType(job)
-		J?.allowed_sexes = sexes_adjust[job]
-	for(var/job as anything in ages_adjust)
-		var/datum/job/J = SSjob.GetJobType(job)
-		J?.allowed_ages = ages_adjust[job]
+	if(islist(blacklist))
+		var/blacklist_count = 0
+		try
+			blacklist_count = length(blacklist)
+		catch
+			blacklist_count = 0
+		for(var/i in 1 to blacklist_count)
+			var/job
+			try
+				job = blacklist[i]
+				change_job_position(job, 0)
+				var/datum/job/J = SSjob.GetJobType(job)
+				J?.job_flags &= ~(JOB_NEW_PLAYER_JOINABLE)
+			catch
+				continue
+	if(islist(slot_adjust))
+		var/slot_adjust_count = 0
+		try
+			slot_adjust_count = length(slot_adjust)
+		catch
+			slot_adjust_count = 0
+		for(var/i in 1 to slot_adjust_count)
+			var/job
+			try
+				job = slot_adjust[i]
+				change_job_position(job, slot_adjust[job])
+			catch
+				continue
+	if(islist(species_adjust))
+		var/species_adjust_count = 0
+		try
+			species_adjust_count = length(species_adjust)
+		catch
+			species_adjust_count = 0
+		for(var/i in 1 to species_adjust_count)
+			var/job
+			try
+				job = species_adjust[i]
+				var/datum/job/J = SSjob.GetJobType(job)
+				J?.allowed_races = species_adjust[job]
+			catch
+				continue
+	if(islist(sexes_adjust))
+		var/sexes_adjust_count = 0
+		try
+			sexes_adjust_count = length(sexes_adjust)
+		catch
+			sexes_adjust_count = 0
+		for(var/i in 1 to sexes_adjust_count)
+			var/job
+			try
+				job = sexes_adjust[i]
+				var/datum/job/J = SSjob.GetJobType(job)
+				J?.allowed_sexes = sexes_adjust[job]
+			catch
+				continue
+	if(islist(ages_adjust))
+		var/ages_adjust_count = 0
+		try
+			ages_adjust_count = length(ages_adjust)
+		catch
+			ages_adjust_count = 0
+		for(var/i in 1 to ages_adjust_count)
+			var/job
+			try
+				job = ages_adjust[i]
+				var/datum/job/J = SSjob.GetJobType(job)
+				J?.allowed_ages = ages_adjust[job]
+			catch
+				continue
 	// Now migrants
-	for(var/migrant as anything in migrant_blacklist)
-		var/datum/migrant_wave/W = MIGRANT_WAVE(migrant)
-		W?.can_roll = FALSE
+	if(islist(migrant_blacklist))
+		var/migrant_blacklist_count = 0
+		try
+			migrant_blacklist_count = length(migrant_blacklist)
+		catch
+			migrant_blacklist_count = 0
+		for(var/i in 1 to migrant_blacklist_count)
+			var/migrant
+			try
+				migrant = migrant_blacklist[i]
+				var/datum/migrant_wave/W = MIGRANT_WAVE(migrant)
+				W?.can_roll = FALSE
+			catch
+				continue
 
 /**
  * job_type`</datum/job/J>`: Type of the job that's being adjusted \
@@ -63,9 +129,11 @@
 	PROTECTED_PROC(TRUE) // no reason to call this outside of /map_adjustment datum. (I didn't add _underbar_ to the proc name because you use this frequently)
 	var/datum/job/adjusting_job = SSjob.GetJobType(job_type)
 	if(!adjusting_job)
-		CRASH("Failed to adjust a job position: [job_type]")
+		log_world("Failed to adjust a job position: [job_type]")
+		return
 	if(isnull(spawn_positions) && isnull(total_positions))
-		CRASH("called without any positions to set")
+		log_world("change_job_position called without any positions to set for [job_type]")
+		return
 
 	if(isnum(spawn_positions))
 		adjusting_job.spawn_positions = spawn_positions

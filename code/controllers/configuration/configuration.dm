@@ -190,12 +190,18 @@
 	return !(var_name in banned_edits) && ..()
 
 /datum/controller/configuration/proc/Get(entry_type)
-	var/datum/config_entry/E = entry_type
-	if(IS_ABSTRACT(E))
+	var/datum/config_entry/default_entry = entry_type
+	if(IS_ABSTRACT(default_entry))
 		CRASH("Tried to retrieve an abstract config_entry: [entry_type]")
-	E = entries_by_type[entry_type]
+	if(!islist(entries_by_type))
+		return initial(default_entry.config_entry_value)
+	var/datum/config_entry/E
+	try
+		E = entries_by_type[entry_type]
+	catch
+		return initial(default_entry.config_entry_value)
 	if(!E)
-		CRASH("Missing config entry for [entry_type]!")
+		return initial(default_entry.config_entry_value)
 	if((E.protection & CONFIG_ENTRY_HIDDEN) && IsAdminAdvancedProcCall() && GLOB.LastAdminCalledProc == "Get" && GLOB.LastAdminCalledTargetRef == "[REF(src)]")
 		log_admin_private("Config access of [entry_type] attempted by [key_name(usr)]")
 		return

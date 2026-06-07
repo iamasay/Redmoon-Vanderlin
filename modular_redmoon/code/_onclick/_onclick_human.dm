@@ -109,50 +109,53 @@
 	var/list/actions_by_part
 
 /datum/interaction_profile/proc/build_actions(mob/living/user, mob/living/target)
-    if (!user || !target)
-        return
+	if(!user || !target)
+		return
 
-    if (!actions_by_part)
-        actions_by_part = list(
-            "head"      = list(),
-            "chest"     = list(),
-            "groin"     = list(),
-            "left_arm"  = list(),
-            "right_arm" = list(),
-            "left_leg"  = list(),
-            "right_leg" = list(),
-            "tail"      = list(),
-        )
+	if(!actions_by_part)
+		actions_by_part = list(
+			"head" = list(),
+			"chest" = list(),
+			"groin" = list(),
+			"left_arm" = list(),
+			"right_arm" = list(),
+			"left_leg" = list(),
+			"right_leg" = list(),
+			"tail" = list(),
+		)
 
-    // очищаем
-    for (var/part in actions_by_part)
-        actions_by_part[part] = list()
+	for(var/part in actions_by_part)
+		actions_by_part[part] = list()
 
-    for (var/interaction_key in SSinteractions.interactions)
-        var/datum/interaction/I = SSinteractions.interactions[interaction_key]
-        if (!I || !I.description)
-            continue
-        if (I.interaction_flags & INTERACTION_FLAG_HIDE_IN_PANEL)
-            continue
+	var/list/favorites = user.client?.prefs?.favorite_interactions
 
-        // проверка на наличие нужных частей/условий У ЮЗЕРА и У ЦЕЛИ
-        if (!I.evaluate_user(user, TRUE, FALSE))
-            continue
-        if (!I.evaluate_target(user, target, TRUE))
-            continue
+	for(var/interaction_key in SSinteractions.interactions)
+		var/datum/interaction/I = SSinteractions.interactions[interaction_key]
+		if(!I?.description)
+			continue
+		if(!interaction_visible_in_panel(I, user, target))
+			continue
+		if(!I.evaluate_user(user, TRUE, FALSE))
+			continue
+		if(!I.evaluate_target(user, target, TRUE))
+			continue
+		if(!islist(I.body_parts) || !length(I.body_parts))
+			continue
 
-        if (!islist(I.body_parts) || !length(I.body_parts))
-            continue
+		var/list/action = list(
+			"id" = "[I.type]",
+			"name" = I.description,
+			"type" = get_interaction_content_type(I),
+			"is_favorite" = is_favorite_interaction(favorites, I.type),
+		)
 
-        var/list/action = list(
-            "id"   = "[I.type]",
-            "name" = I.description,
-        )
+		for(var/part in I.body_parts)
+			if(!(part in actions_by_part))
+				continue
+			actions_by_part[part] += list(action)
 
-        for (var/part in I.body_parts)
-            if (!(part in actions_by_part))
-                continue
-            actions_by_part[part] += list(action)
+	for(var/part in actions_by_part)
+		actions_by_part[part] = sort_interaction_actions(actions_by_part[part])
 
 
 /datum/interaction_profile/New(var/host_mob)
@@ -217,16 +220,16 @@
 	. = ..()
 	var/list/data = list()
 	var/mob/living/M = host.resolve()
-	if (!M)
+	if(!M)
 		return data
 
 	data["entity_from"] = user.real_name
 	data["entity_to"] = M.real_name
 	data["character_ref"] = interaction_screen?.assigned_map
 
-	if (!actions_by_part)
-		build_actions(user, M)
+	build_actions(user, M)
 	data["actions_by_part"] = actions_by_part
+	data["favorite_interactions"] = user.client?.prefs?.favorite_interactions || list()
 
 	return data
 
@@ -248,25 +251,43 @@
 
 /datum/interaction_profile/ui_act(action, list/params, datum/tgui/ui, datum/ui_state/state)
 	. = ..()
-	if (.)
+	if(.)
 		return
 
 	var/mob/living/user = ui.user
 	var/mob/living/target = host?.resolve()
-	if (!user || !target)
+	if(!user || !target)
 		return
 
-	switch (action)
-		if ("run_action_once")
-			var/part = params["part"]
+	switch(action)
+		if("run_action_once")
 			var/action_id = params["action_id"]
-			var/duration = text2num("[params["duration"]]")
-
 			var/datum/interaction/I = find_interaction_by_id(action_id)
-			if (!I)
+			if(!I)
 				return
-
+			if(!interaction_visible_in_panel(I, user, target))
+				to_chat(user, span_warning("This interaction is not available based on consent preferences."))
+				return
+			if(!I.evaluate_user(user, FALSE, TRUE))
+				return
+			if(!I.evaluate_target(user, target, FALSE))
+				return
 			I.do_action(user, target)
+		if("toggle_favorite")
+			var/action_id = params["action_id"]
+			var/datum/interaction/I = find_interaction_by_id(action_id)
+			if(!I || !user.client?.prefs)
+				return
+			var/datum/preferences/prefs = user.client.prefs
+			if(is_favorite_interaction(prefs.favorite_interactions, I.type))
+				prefs.favorite_interactions -= I.type
+				prefs.favorite_interactions -= "[I.type]"
+			else
+				LAZYADD(prefs.favorite_interactions, "[I.type]")
+			prefs.save_preferences()
+			build_actions(user, target)
+			SStgui.update_uis(src)
+			return TRUE
 
 /datum/interaction_profile/ui_interact(mob/user, datum/tgui/ui, datum/tgui/parent_ui)
 	var/mob/living/M = host.resolve()

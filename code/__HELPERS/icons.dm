@@ -1025,34 +1025,65 @@ GLOBAL_LIST_EMPTY(friendly_animal_types)
 		return humanoid_icon_cache[icon_id]
 
 	var/mob/living/carbon/human/dummy/body = generate_or_wait_for_human_dummy(dummy_key)
+	if(!body)
+		return icon('icons/effects/effects.dmi', "nothing")
 
 	if(prefs)
-		prefs.apply_prefs_to(body, TRUE)
+		try
+			prefs.apply_prefs_to(body, TRUE)
+		catch
+			EMPTY_BLOCK_GUARD
 
 	var/datum/outfit/outfit = outfit_override || job?.outfit
 	if(job)
-		body.dna.species.pre_equip_species_outfit(job, body, TRUE)
+		try
+			body.dna.species.pre_equip_species_outfit(job, body, TRUE)
+		catch
+			EMPTY_BLOCK_GUARD
 	if(outfit)
-		body.equipOutfit(outfit, TRUE)
+		try
+			body.equipOutfit(outfit, TRUE)
+		catch
+			EMPTY_BLOCK_GUARD
 
-	body.update_inv_hands(hide_experimental = TRUE)
-	body.update_inv_belt(hide_experimental = TRUE)
-	body.update_inv_back(hide_experimental = TRUE)
-	body.update_inv_head(hide_nonstandard = TRUE)
+	try
+		body.update_inv_hands(hide_experimental = TRUE)
+		body.update_inv_belt(hide_experimental = TRUE)
+		body.update_inv_back(hide_experimental = TRUE)
+		body.update_inv_head(hide_nonstandard = TRUE)
+	catch
+		EMPTY_BLOCK_GUARD
 
 	var/icon/out_icon = icon('icons/effects/effects.dmi', "nothing")
-	for(var/D in showDirs)
-		body.setDir(D)
-		var/icon/partial = getFlatIcon(body, defdir=D)
-		out_icon.Insert(partial,dir=D)
+	var/list/directions = islist(showDirs) ? showDirs : GLOB.cardinals
+	var/dir_count = 0
+	try
+		dir_count = length(directions)
+	catch
+		dir_count = 0
+	for(var/dir_index in 1 to dir_count)
+		var/D
+		try
+			D = directions[dir_index]
+			body.setDir(D)
+			var/icon/partial = getFlatIcon(body, defdir=D)
+			out_icon.Insert(partial,dir=D)
+		catch
+			continue
 
-	body.update_inv_hands()
-	body.update_inv_belt()
-	body.update_inv_back()
-	body.update_inv_head()
+	try
+		body.update_inv_hands()
+		body.update_inv_belt()
+		body.update_inv_back()
+		body.update_inv_head()
+	catch
+		EMPTY_BLOCK_GUARD
 
 	humanoid_icon_cache[icon_id] = out_icon
-	dummy_key ? unset_busy_human_dummy(dummy_key) : qdel(body)
+	try
+		dummy_key ? unset_busy_human_dummy(dummy_key) : qdel(body)
+	catch
+		EMPTY_BLOCK_GUARD
 	return out_icon
 
 //Hook, override to run code on- wait this is images

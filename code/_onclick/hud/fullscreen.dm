@@ -300,14 +300,30 @@
 
 /atom/movable/screen/fullscreen/lighting_backdrop/sunlight/Initialize()
 	. = ..()
-	add_filter("sunlight", 1, layering_filter(render_source = SUNLIGHTING_RENDER_TARGET))
-	SSoutdoor_effects.sunlighting_planes |= src
-	SSoutdoor_effects.transition_sunlight_color(src)
+	try
+		add_filter("sunlight", 1, layering_filter(render_source = SUNLIGHTING_RENDER_TARGET))
+	catch
+		EMPTY_BLOCK_GUARD
+	try
+		if(!islist(SSoutdoor_effects.sunlighting_planes))
+			SSoutdoor_effects.sunlighting_planes = list()
+		if(!(src in SSoutdoor_effects.sunlighting_planes))
+			SSoutdoor_effects.sunlighting_planes += src
+	catch
+		SSoutdoor_effects.sunlighting_planes = list(src)
+	try
+		SSoutdoor_effects.transition_sunlight_color(src)
+	catch
+		EMPTY_BLOCK_GUARD
 	//color = SSoutdoor_effects.last_color
 
 /atom/movable/screen/fullscreen/lighting_backdrop/sunlight/Destroy()
 	. = ..()
-	SSoutdoor_effects.sunlighting_planes -= src
+	try
+		if(islist(SSoutdoor_effects.sunlighting_planes))
+			SSoutdoor_effects.sunlighting_planes -= src
+	catch
+		SSoutdoor_effects.sunlighting_planes = list()
 
 /atom/movable/screen/fullscreen/astral_border
 	icon = 'icons/mob/screens/vampire.dmi'

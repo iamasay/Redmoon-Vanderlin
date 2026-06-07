@@ -677,6 +677,8 @@ GLOBAL_LIST_EMPTY(roundstart_species)
 	for(var/datum/customizer_entry/entry as anything in customizer_entries)
 		var/datum/customizer_choice/customizer_choice = CUSTOMIZER_CHOICE(entry.customizer_choice_type)
 		var/datum/customizer/customizer = CUSTOMIZER(entry.customizer_type)
+		if(!customizer || !customizer_choice)
+			continue
 		if(!customizer.is_allowed(human))
 			continue
 		if(entry.disabled)
@@ -686,16 +688,23 @@ GLOBAL_LIST_EMPTY(roundstart_species)
 /datum/species/proc/reset_all_customizer_accessory_colors(mob/living/carbon/human/human)
 	for(var/datum/customizer_entry/entry as anything in customizer_entries)
 		var/datum/customizer_choice/choice = CUSTOMIZER_CHOICE(entry.customizer_choice_type)
+		if(!choice)
+			continue
 		choice.reset_accessory_colors(human, entry)
 
 /datum/species/proc/randomize_all_customizer_accessories(mob/living/carbon/human/human)
 	for(var/datum/customizer_entry/entry as anything in customizer_entries)
 		var/datum/customizer_choice/choice = CUSTOMIZER_CHOICE(entry.customizer_choice_type)
+		if(!choice)
+			continue
 		choice.randomize_entry(entry, human)
 
 /datum/species/proc/validate_customizer_entries(mob/living/carbon/human/human)
 	customizer_entries = SANITIZE_LIST(customizer_entries)
 	listclearnulls(customizer_entries)
+	if(!islist(customizers))
+		customizer_entries = list()
+		return
 	/// Check if we have any customizer entries that don't match.
 	for(var/datum/customizer_entry/entry as anything in customizer_entries)
 		var/validated = FALSE
@@ -703,9 +712,13 @@ GLOBAL_LIST_EMPTY(roundstart_species)
 			if(customizer_type != entry.customizer_type)
 				continue
 			var/datum/customizer/customizer = CUSTOMIZER(customizer_type)
+			if(!customizer || !length(customizer.customizer_choices))
+				continue
 			if(!(entry.customizer_choice_type in customizer.customizer_choices))
 				continue
 			var/datum/customizer_choice/customizer_choice = CUSTOMIZER_CHOICE(entry.customizer_choice_type)
+			if(!customizer_choice)
+				continue
 			if(entry.type != customizer_choice.customizer_entry_type)
 				continue
 			validated = TRUE
@@ -723,12 +736,17 @@ GLOBAL_LIST_EMPTY(roundstart_species)
 			found = TRUE
 			break
 		var/datum/customizer/customizer = CUSTOMIZER(customizer_type)
+		if(!customizer || !length(customizer.customizer_choices))
+			continue
 		if(!found)
 			customizer_entries += customizer.make_default_customizer_entry(human, FALSE)
 
 	/// Validate the variables within customizer entries
 	for(var/datum/customizer_entry/entry as anything in customizer_entries)
 		var/datum/customizer_choice/customizer_choice = CUSTOMIZER_CHOICE(entry.customizer_choice_type)
+		if(!customizer_choice)
+			customizer_entries -= entry
+			continue
 		customizer_choice.validate_entry(human, entry)
 
 /datum/species/proc/on_species_gain(mob/living/carbon/C, datum/species/old_species, datum/preferences/pref_load)
@@ -986,8 +1004,18 @@ GLOBAL_LIST_EMPTY(roundstart_species)
 	return
 
 /datum/species/proc/can_equip(obj/item/I, slot, disable_warning, mob/living/carbon/human/H, bypass_equip_delay_self = FALSE)
-	if(slot in no_equip)
-		if(!I.species_exception || !is_type_in_list(src, I.species_exception))
+	var/slot_blocked = FALSE
+	try
+		slot_blocked = islist(no_equip) && (slot in no_equip)
+	catch
+		no_equip = list()
+	if(slot_blocked)
+		var/has_species_exception = FALSE
+		try
+			has_species_exception = I.species_exception && is_type_in_list(src, I.species_exception)
+		catch
+			has_species_exception = FALSE
+		if(!has_species_exception)
 			return FALSE
 
 	switch(slot)

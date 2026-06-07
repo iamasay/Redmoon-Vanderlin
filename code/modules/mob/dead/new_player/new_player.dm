@@ -23,17 +23,34 @@ GLOBAL_LIST_INIT(roleplay_readme, file2list("strings/rt/Lore_Primer.txt"))
 	hud_type = /datum/hud/new_player
 
 /mob/dead/new_player/Initialize()
-	if(length(GLOB.newplayer_start))
-		forceMove(pick(GLOB.newplayer_start))
+	var/has_newplayer_start = FALSE
+	try
+		has_newplayer_start = islist(GLOB.newplayer_start) && length(GLOB.newplayer_start)
+	catch
+		GLOB.newplayer_start = list()
+	if(has_newplayer_start)
+		try
+			forceMove(pick(GLOB.newplayer_start))
+		catch
+			forceMove(locate(1,1,1))
 	else
 		forceMove(locate(1,1,1))
 
 	. = ..()
 
-	GLOB.new_player_list += src
+	try
+		if(!islist(GLOB.new_player_list))
+			GLOB.new_player_list = list()
+		GLOB.new_player_list += src
+	catch
+		GLOB.new_player_list = list(src)
 
 /mob/dead/new_player/Destroy()
-	GLOB.new_player_list -= src
+	try
+		if(islist(GLOB.new_player_list))
+			GLOB.new_player_list -= src
+	catch
+		GLOB.new_player_list = list()
 	return ..()
 
 ///Say verb

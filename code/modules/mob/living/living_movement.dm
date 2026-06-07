@@ -45,27 +45,42 @@
 	update_move_intent_slowdown()
 
 /mob/living/update_config_movespeed()
-	update_move_intent_slowdown()
+	try
+		update_move_intent_slowdown()
+	catch
+		movespeed_modification = null
 	return ..()
 
 /mob/living/equip_to_slot_if_possible(obj/item/W, slot, qdel_on_fail = FALSE, disable_warning = FALSE, redraw_mob = TRUE, bypass_equip_delay_self = FALSE, initial)
-	. = ..()
-	update_config_movespeed()
+	try
+		. = ..()
+	catch
+		return FALSE
+	try
+		update_config_movespeed()
+	catch
+		movespeed_modification = null
 
 /mob/living/proc/update_move_intent_slowdown()
 	var/mod = 0
-	switch(m_intent)
-		if(MOVE_INTENT_WALK)
-			mod = CONFIG_GET(number/movedelay/walk_delay)
-		if(MOVE_INTENT_RUN)
-			mod = CONFIG_GET(number/movedelay/run_delay)
-		if(MOVE_INTENT_SNEAK)
-			mod = 6
+	try
+		switch(m_intent)
+			if(MOVE_INTENT_WALK)
+				mod = CONFIG_GET(number/movedelay/walk_delay)
+			if(MOVE_INTENT_RUN)
+				mod = CONFIG_GET(number/movedelay/run_delay)
+			if(MOVE_INTENT_SNEAK)
+				mod = 6
+	catch
+		mod = 0
 	var/spdchange = (10-GET_MOB_ATTRIBUTE_VALUE(src, STAT_SPEED))*0.1
 	spdchange = clamp(spdchange, -0.5, 1)  //if this is not clamped, it can make you go faster than you should be able to.
 	mod = mod+spdchange
 	//maximum speed is achieved at 15 speed.
-	add_movespeed_modifier(MOVESPEED_ID_MOB_WALK_RUN_CONFIG_SPEED, TRUE, 100, override = TRUE, multiplicative_slowdown = mod)
+	try
+		add_movespeed_modifier(MOVESPEED_ID_MOB_WALK_RUN_CONFIG_SPEED, TRUE, 100, override = TRUE, multiplicative_slowdown = mod)
+	catch
+		movespeed_modification = null
 
 /mob/living/proc/update_turf_movespeed(turf/open/T)
 	if(isopenturf(T))

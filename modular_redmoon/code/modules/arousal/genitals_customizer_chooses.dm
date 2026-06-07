@@ -1,3 +1,7 @@
+/datum/customizer/organ/genital
+	abstract_type = /datum/customizer/organ/genital
+	name = "Genital"
+
 /datum/customizer_entry/organ/genital
 	var/genital_size
 	var/show_size_dropdown = FALSE

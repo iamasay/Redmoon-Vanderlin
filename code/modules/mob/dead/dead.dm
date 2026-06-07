@@ -16,18 +16,41 @@ INITIALIZE_IMMEDIATE(/mob/dead)
 		stack_trace("Warning: [src]([type]) initialized multiple times!")
 	flags_1 |= INITIALIZED_1
 	tag = "mob_[next_mob_id++]"
-	GLOB.mob_list += src
+	try
+		if(!islist(GLOB.mob_list))
+			GLOB.mob_list = list()
+		GLOB.mob_list += src
+	catch
+		GLOB.mob_list = list(src)
 
-	prepare_huds()
+	try
+		prepare_huds()
+	catch
+		EMPTY_BLOCK_GUARD
 
-	if(length(CONFIG_GET(keyed_list/cross_server)))
+	var/has_cross_server = FALSE
+	try
+		has_cross_server = length(CONFIG_GET(keyed_list/cross_server))
+	catch
+		has_cross_server = FALSE
+	if(has_cross_server)
 		add_verb(src, /mob/dead/proc/server_hop)
-	set_focus(src)
-	become_hearing_sensitive()
+	try
+		set_focus(src)
+	catch
+		EMPTY_BLOCK_GUARD
+	try
+		become_hearing_sensitive()
+	catch
+		EMPTY_BLOCK_GUARD
 	return INITIALIZE_HINT_NORMAL
 
 /mob/dead/Destroy()
-	GLOB.mob_list -= src
+	try
+		if(islist(GLOB.mob_list))
+			GLOB.mob_list -= src
+	catch
+		GLOB.mob_list = list()
 	return ..()
 
 /mob/dead/canUseStorage()
@@ -175,15 +198,34 @@ INITIALIZE_IMMEDIATE(/mob/dead)
 	C << link("[addr]?server_hop=[key]")
 
 /mob/dead/proc/update_z(new_z) // 1+ to register, null to unregister
-	if (registered_z != new_z)
-		if (registered_z)
-			SSmobs.dead_players_by_zlevel[registered_z] -= src
-		if (client)
-			if (new_z)
-				SSmobs.dead_players_by_zlevel[new_z] += src
-			registered_z = new_z
-		else
-			registered_z = null
+	try
+		if(!islist(SSmobs.dead_players_by_zlevel))
+			SSmobs.dead_players_by_zlevel = list()
+		if (registered_z != new_z)
+			if (registered_z)
+				try
+					var/list/old_z_players = SSmobs.dead_players_by_zlevel[registered_z]
+					if(islist(old_z_players))
+						old_z_players -= src
+				catch
+					SSmobs.dead_players_by_zlevel[registered_z] = list()
+			if (client)
+				if (new_z)
+					try
+						var/list/new_z_players = SSmobs.dead_players_by_zlevel[new_z]
+						if(!islist(new_z_players))
+							new_z_players = list()
+							SSmobs.dead_players_by_zlevel[new_z] = new_z_players
+						if(!(src in new_z_players))
+							new_z_players += src
+					catch
+						SSmobs.dead_players_by_zlevel[new_z] = list(src)
+				registered_z = new_z
+			else
+				registered_z = null
+	catch
+		SSmobs.dead_players_by_zlevel = list()
+		registered_z = new_z
 
 /mob/dead/Login()
 	. = ..()

@@ -45,15 +45,41 @@ SUBSYSTEM_DEF(overwatch)
 	if(!.)
 		return
 
-	tgui_panel_asn_data = GetAsnBanlistDatabase()
-	tgui_panel_wl_data = GetWhitelistDatabase()
+	try
+		tgui_panel_asn_data = GetAsnBanlistDatabase()
+	catch
+		tgui_panel_asn_data = list()
+	try
+		tgui_panel_wl_data = GetWhitelistDatabase()
+	catch
+		tgui_panel_wl_data = list()
 
-	var/list/clients_to_check = postponed_client_queue.Copy()
-	postponed_client_queue.Cut()
-	for (var/client/C in clients_to_check)
-		CollectClientData(C)
-		HandleClientAccessCheck(C, postponed = TRUE)
-		HandleASNbanCheck(C, postponed = TRUE)
+	if(!islist(postponed_client_queue))
+		postponed_client_queue = list()
+	var/list/clients_to_check
+	try
+		clients_to_check = postponed_client_queue.Copy()
+		postponed_client_queue.Cut()
+	catch
+		clients_to_check = list()
+		postponed_client_queue = list()
+	var/client_check_count = 0
+	try
+		client_check_count = length(clients_to_check)
+	catch
+		client_check_count = 0
+	for (var/client_index in 1 to client_check_count)
+		var/client/C
+		try
+			C = clients_to_check[client_index]
+		catch
+			continue
+		try
+			CollectClientData(C)
+			HandleClientAccessCheck(C, postponed = TRUE)
+			HandleASNbanCheck(C, postponed = TRUE)
+		catch
+			continue
 		CHECK_TICK
 
 /datum/controller/subsystem/overwatch/proc/CheckDBCon()
@@ -75,29 +101,43 @@ SUBSYSTEM_DEF(overwatch)
 	var/_ip_addr = C.address
 
 	if(!is_active)
-		postponed_client_queue.Add(C)
+		if(!islist(postponed_client_queue))
+			postponed_client_queue = list()
+		try
+			postponed_client_queue.Add(C)
+		catch
+			postponed_client_queue = list(C)
 		return
 
 	if(!CheckDBCon())
 		return
 
-	C.ip_info.is_whitelisted = CheckWhitelist(C.ckey)
+	try
+		C.ip_info.is_whitelisted = CheckWhitelist(C.ckey)
+	catch
+		return
 
 	if(!_ip_addr || _ip_addr == "127.0.0.1")
 		return
 
-	var/list/response = GetAPIresponse(_ip_addr, C)
+	var/list/response
+	try
+		response = GetAPIresponse(_ip_addr, C)
+	catch
+		response = null
 
 	if(!response || !C)
 		return
 
-	C.ip_info.ip = _ip_addr
-	C.ip_info.ip_as = response["as"]
-	C.ip_info.ip_mobile = response["mobile"]
-	C.ip_info.ip_proxy = response["proxy"]
-	C.ip_info.ip_hosting = response["hosting"]
-
-	C.ip_info.is_loaded = TRUE
+	try
+		C.ip_info.ip = _ip_addr
+		C.ip_info.ip_as = response["as"]
+		C.ip_info.ip_mobile = response["mobile"]
+		C.ip_info.ip_proxy = response["proxy"]
+		C.ip_info.ip_hosting = response["hosting"]
+		C.ip_info.is_loaded = TRUE
+	catch
+		EMPTY_BLOCK_GUARD
 	return
 
 /datum/controller/subsystem/overwatch/proc/GetAPIresponse(ip, client/C = null)

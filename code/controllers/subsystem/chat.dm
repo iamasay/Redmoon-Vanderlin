@@ -67,12 +67,21 @@ SUBSYSTEM_DEF(chat)
 		LAZYADDASSOCLIST(client_to_payloads, client.ckey, generate_payload(client, message_data))
 
 /datum/controller/subsystem/chat/proc/send_immediate(send_target, list/message_data)
-	var/list/targets = islist(send_target) ? send_target : list(send_target)
-	for(var/target in targets)
-		var/client/client = CLIENT_FROM_VAR(target)
-		if(isnull(client))
-			continue
-		send_payload_to_client(client, generate_payload(client, message_data))
+	if(!islist(message_data))
+		return
+	var/list/targets
+	try
+		targets = islist(send_target) ? send_target : list(send_target)
+	catch
+		return
+	try
+		for(var/target in targets)
+			var/client/client = CLIENT_FROM_VAR(target)
+			if(isnull(client))
+				continue
+			send_payload_to_client(client, generate_payload(client, message_data))
+	catch
+		return
 
 /datum/controller/subsystem/chat/proc/handle_resend(client/client, sequence)
 	var/list/client_history = client_to_reliability_history[client.ckey]

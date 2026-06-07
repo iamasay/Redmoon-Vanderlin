@@ -18,9 +18,7 @@ PROCESSING_SUBSYSTEM_DEF(interactions)
 	prepare_interactions()
 	prepare_blacklisted_mobs()
 	. = ..()
-	var/extra_info = "<font style='transform: translate(0%, -25%);'>↳</font> Loaded [LAZYLEN(interactions)] interactions!"
-	to_chat(world, span_boldannounce(extra_info))
-	// log_subsystem(src, extra_info)
+	log_world("Loaded [LAZYLEN(interactions)] interactions!")
 
 /datum/controller/subsystem/processing/interactions/stat_entry(msg)
 	msg += "|🖐:[LAZYLEN(interactions)]|"
@@ -29,18 +27,42 @@ PROCESSING_SUBSYSTEM_DEF(interactions)
 
 /// Makes the interactions, they're also a global list because having it as a list and just hanging around there is stupid
 /datum/controller/subsystem/processing/interactions/proc/prepare_interactions()
-	QDEL_NULL_LIST(interactions)
+	var/list/old_interactions = interactions
 	interactions = list()
-	for(var/datum/interaction/interaction as anything in subtypesof(/datum/interaction))
-		// Basetype, do not create
-		if(!initial(interaction.description))
+	if(islist(old_interactions))
+		try
+			for(var/interaction_key in old_interactions)
+				var/datum/interaction/old_interaction = old_interactions[interaction_key]
+				if(old_interaction)
+					qdel(old_interaction)
+		catch
+			EMPTY_BLOCK_GUARD
+	for(var/datum/interaction/interaction_type as anything in subtypesof(/datum/interaction))
+		var/interaction_description
+		try
+			interaction_description = initial(interaction_type.description)
+		catch
 			continue
-		interaction = new interaction()
-		interactions["[interaction.type]"] = interaction
+		if(!interaction_description)
+			continue
+		var/datum/interaction/interaction
+		try
+			interaction = new interaction_type()
+		catch
+			continue
+		if(interaction)
+			interactions["[interaction.type]"] = interaction
 
 /// Blacklisting!
 /datum/controller/subsystem/processing/interactions/proc/prepare_blacklisted_mobs()
-	blacklisted_mobs = typecacheof(blacklisted_mobs)
+	if(initialized_blacklist && islist(blacklisted_mobs))
+		return
+	blacklisted_mobs = typecacheof(list(
+		/mob/dead,
+		/mob/dview,
+		/mob/camera,
+		/mob/living/simple_animal,
+	))
 	initialized_blacklist = TRUE
 
 /*

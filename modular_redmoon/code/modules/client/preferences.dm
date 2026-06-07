@@ -30,3 +30,8 @@
 	var/extremeharm = "No"
 	var/unholypref = "No"
 	var/list/gfluid_blacklist = list()
+
+	/// How long the character can stay aroused before climax (25–200). Applied to DNA on spawn.
+	var/lust_tolerance = 100
+	/// Orgasm limit per encounter; -1 disables impotency. Applied to DNA on spawn.
+	var/sexual_potency = 15

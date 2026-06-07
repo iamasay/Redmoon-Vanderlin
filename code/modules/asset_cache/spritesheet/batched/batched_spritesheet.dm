@@ -139,9 +139,15 @@
 	create_spritesheets()
 
 	if(should_load_immediately())
-		realize_spritesheets(yield = FALSE)
+		try
+			realize_spritesheets(yield = FALSE)
+		catch
+			EMPTY_BLOCK_GUARD
 	else
-		SSasset_loading.queue_asset(src)
+		try
+			SSasset_loading.queue_asset(src)
+		catch
+			EMPTY_BLOCK_GUARD
 
 /datum/asset/spritesheet_batched/unregister()
 	CRASH("unregister() called on batched spritesheet! Bad!")
@@ -244,17 +250,48 @@
 		return
 
 	var/all = list("spritesheet_[name].css")
-	for(var/size_id in sizes)
-		all += "[name]_[size_id].png"
-	. = SSassets.transport.send_assets(client, all)
+	if(!islist(sizes))
+		sizes = list()
+	var/size_count = 0
+	try
+		size_count = length(sizes)
+	catch
+		size_count = 0
+	for(var/size_index in 1 to size_count)
+		var/size_id
+		try
+			size_id = sizes[size_index]
+			all += "[name]_[size_id].png"
+		catch
+			continue
+	try
+		. = SSassets.transport.send_assets(client, all)
+	catch
+		. = FALSE
 
 /datum/asset/spritesheet_batched/get_url_mappings()
 	if (!name)
 		return
 
-	. = list("spritesheet_[name].css" = SSassets.transport.get_asset_url("spritesheet_[name].css"))
-	for(var/size_id in sizes)
-		.["[name]_[size_id].png"] = SSassets.transport.get_asset_url("[name]_[size_id].png")
+	. = list()
+	try
+		.["spritesheet_[name].css"] = SSassets.transport.get_asset_url("spritesheet_[name].css")
+	catch
+		.["spritesheet_[name].css"] = "spritesheet_[name].css"
+	if(!islist(sizes))
+		sizes = list()
+	var/size_count = 0
+	try
+		size_count = length(sizes)
+	catch
+		size_count = 0
+	for(var/size_index in 1 to size_count)
+		var/size_id
+		try
+			size_id = sizes[size_index]
+			.["[name]_[size_id].png"] = SSassets.transport.get_asset_url("[name]_[size_id].png")
+		catch
+			continue
 
 /datum/asset/spritesheet_batched/proc/generate_css()
 	var/list/out = list()
@@ -328,7 +365,10 @@
 	return {"<link rel="stylesheet" href="[css_filename()]" />"}
 
 /datum/asset/spritesheet_batched/proc/css_filename()
-	return SSassets.transport.get_asset_url("spritesheet_[name].css")
+	try
+		return SSassets.transport.get_asset_url("spritesheet_[name].css")
+	catch
+		return "spritesheet_[name].css"
 
 /datum/asset/spritesheet_batched/proc/icon_tag(sprite_name)
 	var/sprite = sprites[sprite_name]

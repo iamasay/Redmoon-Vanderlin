@@ -209,13 +209,30 @@
 		mob.atom_flags &= ~NO_DIR_CHANGE_ON_MOVE
 
 	if(mob.hud_used)
-		for(var/atom/movable/screen/eye_intent/eyet in mob.hud_used.static_inventory)
-			eyet.update_appearance(UPDATE_ICON) //Update eye icon
+		var/list/static_inventory = mob.hud_used.static_inventory
+		if(islist(static_inventory))
+			var/static_inventory_count = 0
+			try
+				static_inventory_count = length(static_inventory)
+			catch
+				static_inventory_count = 0
+			for(var/static_inventory_index in 1 to static_inventory_count)
+				var/atom/movable/screen/eye_intent/eyet
+				try
+					eyet = static_inventory[static_inventory_index]
+				catch
+					continue
+				if(istype(eyet))
+					eyet.update_appearance(UPDATE_ICON) //Update eye icon
 
 	if(!mob.atkswinging)
 		return
 
-	var/list/modifiers = params2list(params)
+	var/list/modifiers = list()
+	try
+		modifiers = params2list(params)
+	catch
+		modifiers = list()
 	if(LAZYACCESS(modifiers, LEFT_CLICK))
 		if(mob.atkswinging != "left")
 			mob.atkswinging = null
@@ -228,7 +245,11 @@
 
 	if (mouse_up_icon)
 		mouse_pointer_icon = mouse_up_icon
-	selected_target[1] = null
+	try
+		if(islist(selected_target))
+			selected_target[1] = null
+	catch
+		selected_target = list(null)
 
 //	var/list/L = params2list(params)
 

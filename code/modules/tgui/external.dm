@@ -194,10 +194,21 @@
  * return bool If TRUE, prevents propagation of the topic call.
  */
 /proc/tgui_Topic(href_list)
-	// Skip non-tgui topics
-	if(!href_list["tgui"])
+	if(!islist(href_list) || !usr?.client)
 		return FALSE
-	var/type = href_list["type"]
+	// Skip non-tgui topics
+	var/is_tgui
+	try
+		is_tgui = href_list["tgui"]
+	catch
+		return FALSE
+	if(!is_tgui)
+		return FALSE
+	var/type
+	try
+		type = href_list["type"]
+	catch
+		return TRUE
 	// Unconditionally collect tgui logs
 	if(type == "log")
 		var/context = href_list["window_id"]
@@ -213,35 +224,77 @@
 		usr.client.tgui_cache_reloaded = TRUE
 		// Notify windows
 		var/list/windows = usr.client.tgui_windows
-		for(var/window_id in windows)
-			var/datum/tgui_window/window = windows[window_id]
-			if (window.status == TGUI_WINDOW_READY)
-				window.on_message(type, null, href_list)
+		if(!islist(windows))
+			usr.client.tgui_windows = list()
+			return TRUE
+		var/window_count = 0
+		try
+			window_count = length(windows)
+		catch
+			usr.client.tgui_windows = list()
+			return TRUE
+		for(var/window_index in 1 to window_count)
+			var/window_id
+			var/datum/tgui_window/window
+			try
+				window_id = windows[window_index]
+				window = windows[window_id]
+			catch
+				continue
+			if (window?.status == TGUI_WINDOW_READY)
+				try
+					window.on_message(type, null, href_list)
+				catch
+					continue
 		return TRUE
 	// Locate window
-	var/window_id = href_list["window_id"]
+	var/window_id
+	try
+		window_id = href_list["window_id"]
+	catch
+		return TRUE
 	var/datum/tgui_window/window
 	if(window_id)
-		window = usr.client.tgui_windows[window_id]
+		try
+			if(!islist(usr.client.tgui_windows))
+				usr.client.tgui_windows = list()
+			window = usr.client.tgui_windows[window_id]
+		catch
+			usr.client.tgui_windows = list()
+			window = null
 		if(!window)
 			log_tgui(usr,
 				"Error: Couldn't find the window datum, force closing.",
 				context = window_id)
-			SStgui.force_close_window(usr, window_id)
+			try
+				SStgui.force_close_window(usr, window_id)
+			catch
+				EMPTY_BLOCK_GUARD
 			return TRUE
 
 	// Decode payload
 	var/payload
-	if(href_list["payload"])
-		var/payload_text = href_list["payload"]
+	var/payload_text
+	try
+		payload_text = href_list["payload"]
+	catch
+		payload_text = null
+	if(payload_text)
 
 		if (!rustg_json_is_valid(payload_text))
 			log_tgui(usr, "Error: Invalid JSON")
 			return TRUE
 
-		payload = json_decode(payload_text)
+		try
+			payload = json_decode(payload_text)
+		catch
+			log_tgui(usr, "Error: Invalid JSON")
+			return TRUE
 
 	// Pass message to window
 	if(window)
-		window.on_message(type, payload, href_list)
+		try
+			window.on_message(type, payload, href_list)
+		catch
+			return TRUE
 	return TRUE

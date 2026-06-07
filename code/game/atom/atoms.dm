@@ -181,7 +181,7 @@
 
 	var/do_initialize = SSatoms.initialized
 	if(do_initialize != INITIALIZATION_INSSATOMS)
-		args[1] = do_initialize == INITIALIZATION_INNEW_MAPLOAD
+		args[1] = (do_initialize == INITIALIZATION_INNEW_MAPLOAD)
 		if(SSatoms.InitAtom(src, args))
 			//we were deleted
 			return
@@ -1258,27 +1258,51 @@
 	attacker.log_message(reverse_message, LOG_ATTACK, "red", FALSE) // log it in the attacker's personal log too, but not log globally because it was already done.
 
 /atom/movable/proc/add_filter(name, priority, list/params)
-	if(!filter_data)
+	if(!islist(filter_data))
 		filter_data = list()
-	var/list/p = params.Copy()
+	var/list/p = list()
+	try
+		p = islist(params) ? params.Copy() : list()
+	catch
+		p = list()
 	p["priority"] = priority
-	filter_data[name] = p
-	update_filters()
+	try
+		filter_data[name] = p
+	catch
+		filter_data = list()
+		filter_data[name] = p
+	try
+		update_filters()
+	catch
+		EMPTY_BLOCK_GUARD
 
 /atom/movable/proc/remove_filter(name_or_names)
-	if(!filter_data)
+	if(!islist(filter_data) || !length(filter_data))
 		return
 
 	var/list/names = islist(name_or_names) ? name_or_names : list(name_or_names)
 
 	. = FALSE
-	for(var/name in names)
-		if(filter_data[name])
-			filter_data -= name
-			. = TRUE
+	var/name_count = 0
+	try
+		name_count = length(names)
+	catch
+		name_count = 0
+	for(var/name_index in 1 to name_count)
+		var/name
+		try
+			name = names[name_index]
+			if(filter_data[name])
+				filter_data -= name
+				. = TRUE
+		catch
+			continue
 
 	if(.)
-		update_filters()
+		try
+			update_filters()
+		catch
+			EMPTY_BLOCK_GUARD
 	return .
 
 /atom/movable/proc/clear_filters()
@@ -1293,12 +1317,34 @@
 	filters = null
 	var/atom/atom_cast = src // filters only work with images or atoms.
 	atom_cast.filters = null
-	sortTim(filter_data, GLOBAL_PROC_REF(cmp_filter_data_priority), TRUE)
-	for(var/filter_raw in filter_data)
-		var/list/data = filter_data[filter_raw]
-		var/list/arguments = data.Copy()
-		arguments -= "priority"
-		atom_cast.filters += filter(arglist(arguments))
+	if(!islist(filter_data) || !length(filter_data))
+		filter_data = null
+		return
+	try
+		sortTim(filter_data, GLOBAL_PROC_REF(cmp_filter_data_priority), TRUE)
+	catch
+		// Keep insertion order if sorting fails on corrupted list data.
+		EMPTY_BLOCK_GUARD
+	var/filter_count = 0
+	try
+		filter_count = length(filter_data)
+	catch
+		filter_data = null
+		return
+	for(var/filter_index in 1 to filter_count)
+		var/filter_raw
+		var/list/data
+		var/list/arguments
+		try
+			filter_raw = filter_data[filter_index]
+			data = filter_data[filter_raw]
+			if(!islist(data))
+				continue
+			arguments = data.Copy()
+			arguments -= "priority"
+			atom_cast.filters += filter(arglist(arguments))
+		catch
+			continue
 	UNSETEMPTY(filter_data)
 
 /obj/item/update_filters()

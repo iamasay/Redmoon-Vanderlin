@@ -236,11 +236,21 @@
 /atom/movable/screen/plane_master/weather_effect/Initialize()
 	. = ..()
 	//add_filter("weather_effect", 1, alpha_mask_filter(render_source = WEATHER_RENDER_TARGET))
-	SSoutdoor_effects.weather_planes_need_vis |= src
+	try
+		if(!islist(SSoutdoor_effects.weather_planes_need_vis))
+			SSoutdoor_effects.weather_planes_need_vis = list()
+		if(!(src in SSoutdoor_effects.weather_planes_need_vis))
+			SSoutdoor_effects.weather_planes_need_vis += src
+	catch
+		SSoutdoor_effects.weather_planes_need_vis = list(src)
 
 /atom/movable/screen/plane_master/weather_effect/Destroy()
 	. = ..()
-	SSoutdoor_effects.weather_planes_need_vis -= src
+	try
+		if(islist(SSoutdoor_effects.weather_planes_need_vis))
+			SSoutdoor_effects.weather_planes_need_vis -= src
+	catch
+		SSoutdoor_effects.weather_planes_need_vis = list()
 
 //Contains all sunlight overlays
 /atom/movable/screen/plane_master/sunlight

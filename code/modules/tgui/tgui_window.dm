@@ -90,16 +90,46 @@
 	html = replacetextEx(html, "\[tgui:strictMode]", strict_mode)
 	// Inject assets
 	var/inline_assets_str = ""
-	for(var/datum/asset/asset in assets)
-		var/mappings = asset.get_url_mappings()
-		for(var/name in mappings)
-			var/url = mappings[name]
-			// Not encoding since asset strings are considered safe
-			if(copytext(name, -4) == ".css")
-				inline_assets_str += "Byond.loadCss('[url]', true);\n"
-			else if(copytext(name, -3) == ".js")
-				inline_assets_str += "Byond.loadJs('[url]', true);\n"
-		asset.send(client)
+	if(!islist(assets))
+		assets = list()
+	var/asset_count = 0
+	try
+		asset_count = length(assets)
+	catch
+		asset_count = 0
+	for(var/asset_index in 1 to asset_count)
+		var/datum/asset/asset
+		var/list/mappings
+		try
+			asset = assets[asset_index]
+			if(!asset)
+				continue
+			mappings = asset.get_url_mappings()
+		catch
+			continue
+		if(islist(mappings))
+			var/mapping_count = 0
+			try
+				mapping_count = length(mappings)
+			catch
+				mapping_count = 0
+			for(var/mapping_index in 1 to mapping_count)
+				var/name
+				var/url
+				try
+					name = mappings[mapping_index]
+					url = mappings[name]
+					// Not encoding since asset strings are considered safe
+					if(copytext(name, -4) == ".css")
+						inline_assets_str += "Byond.loadCss('[url]', true);\n"
+					else if(copytext(name, -3) == ".js")
+						inline_assets_str += "Byond.loadJs('[url]', true);\n"
+				catch
+					continue
+		try
+			asset.send(client)
+		catch
+			EMPTY_BLOCK_GUARD
 	if(length(inline_assets_str))
 		inline_assets_str = "<script>\n" + inline_assets_str + "</script>\n"
 	html = replacetextEx(html, "<!-- tgui:assets -->\n", inline_assets_str)
@@ -136,8 +166,20 @@
 		inline_js = initial_inline_js,
 		inline_css = initial_inline_css)
 	// Resend assets
-	for(var/datum/asset/asset in sent_assets)
-		send_asset(asset)
+	if(!islist(sent_assets))
+		sent_assets = list()
+	var/sent_asset_count = 0
+	try
+		sent_asset_count = length(sent_assets)
+	catch
+		sent_asset_count = 0
+	for(var/asset_index in 1 to sent_asset_count)
+		var/datum/asset/asset
+		try
+			asset = sent_assets[asset_index]
+			send_asset(asset)
+		catch
+			continue
 
 /**
  * public
@@ -299,17 +341,35 @@
 	if(!client || !asset)
 		return
 
-	sent_assets |= list(asset)
-	. = asset.send(client)
+	if(!islist(sent_assets))
+		sent_assets = list()
+	try
+		if(!(asset in sent_assets))
+			sent_assets += asset
+	catch
+		sent_assets = list(asset)
+	try
+		. = asset.send(client)
+	catch
+		. = FALSE
 
 	if(istype(asset, /datum/asset/spritesheet))
 		var/datum/asset/spritesheet/spritesheet = asset
-		send_message("asset/stylesheet", spritesheet.css_filename())
+		try
+			send_message("asset/stylesheet", spritesheet.css_filename())
+		catch
+			EMPTY_BLOCK_GUARD
 	else if(istype(asset, /datum/asset/spritesheet_batched))
 		var/datum/asset/spritesheet_batched/spritesheet = asset
-		send_message("asset/stylesheet", spritesheet.css_filename())
+		try
+			send_message("asset/stylesheet", spritesheet.css_filename())
+		catch
+			EMPTY_BLOCK_GUARD
 
-	send_raw_message(asset.get_serialized_url_mappings())
+	try
+		send_raw_message(asset.get_serialized_url_mappings())
+	catch
+		EMPTY_BLOCK_GUARD
 
 /**
  * private
@@ -346,8 +406,20 @@
 	// Status can be READY if user has refreshed the window.
 	if(type == "ready" && status == TGUI_WINDOW_READY)
 		// Resend the assets
-		for(var/asset in sent_assets)
-			send_asset(asset)
+		if(!islist(sent_assets))
+			sent_assets = list()
+		var/sent_asset_count = 0
+		try
+			sent_asset_count = length(sent_assets)
+		catch
+			sent_asset_count = 0
+		for(var/asset_index in 1 to sent_asset_count)
+			var/asset
+			try
+				asset = sent_assets[asset_index]
+				send_asset(asset)
+			catch
+				continue
 	// Mark this window as fatally errored which prevents it from
 	// being suspended.
 	if(type == "log" && href_list["fatal"])

@@ -51,8 +51,31 @@
  * @param {int} toIndex - The index to stop sorting at. Default: 0.
  */
 /proc/sortTim(list/to_sort, cmp = GLOBAL_PROC_REF(cmp_numeric_asc), associative = FALSE, fromIndex = 1, toIndex = 0) as /list
-	CREATE_SORT_INSTANCE(to_sort, cmp, associative, fromIndex, toIndex)
-	sorter.timSort(fromIndex, toIndex)
+	if(!islist(to_sort))
+		return to_sort
+	var/list_length = 0
+	try
+		list_length = length(to_sort)
+	catch
+		return to_sort
+	if(list_length < 2)
+		return to_sort
+	fromIndex = fromIndex % list_length
+	toIndex = toIndex % (list_length + 1)
+	if (fromIndex <= 0)
+		fromIndex += list_length
+	if (toIndex <= 0)
+		toIndex += list_length + 1
+	var/datum/sort_instance/sorter = GLOB.sort_instance
+	if (isnull(sorter))
+		sorter = new
+	sorter.L = to_sort
+	sorter.cmp = cmp
+	sorter.associative = associative
+	try
+		sorter.timSort(fromIndex, toIndex)
+	catch
+		return to_sort
 	return to_sort
 
 /**
@@ -63,8 +86,31 @@
  * - https://en.wikipedia.org/wiki/Merge_sort
  */
 /proc/sortMerge(list/to_sort, cmp = GLOBAL_PROC_REF(cmp_numeric_asc), associative = FALSE, fromIndex = 1, toIndex = 0) as /list
-	CREATE_SORT_INSTANCE(to_sort, cmp, associative, fromIndex, toIndex)
-	sorter.mergeSort(fromIndex, toIndex)
+	if(!islist(to_sort))
+		return to_sort
+	var/list_length = 0
+	try
+		list_length = length(to_sort)
+	catch
+		return to_sort
+	if(list_length < 2)
+		return to_sort
+	fromIndex = fromIndex % list_length
+	toIndex = toIndex % (list_length + 1)
+	if (fromIndex <= 0)
+		fromIndex += list_length
+	if (toIndex <= 0)
+		toIndex += list_length + 1
+	var/datum/sort_instance/sorter = GLOB.sort_instance
+	if (isnull(sorter))
+		sorter = new
+	sorter.L = to_sort
+	sorter.cmp = cmp
+	sorter.associative = associative
+	try
+		sorter.mergeSort(fromIndex, toIndex)
+	catch
+		return to_sort
 	return to_sort
 
 /**
@@ -75,8 +121,31 @@
  * - https://en.wikipedia.org/wiki/Insertion_sort
  */
 /proc/sortInsert(list/to_sort, cmp = GLOBAL_PROC_REF(cmp_numeric_asc), associative = FALSE, fromIndex = 1, toIndex = 0) as /list
-	CREATE_SORT_INSTANCE(to_sort, cmp, associative, fromIndex, toIndex)
-	sorter.binarySort(fromIndex, toIndex)
+	if(!islist(to_sort))
+		return to_sort
+	var/list_length = 0
+	try
+		list_length = length(to_sort)
+	catch
+		return to_sort
+	if(list_length < 2)
+		return to_sort
+	fromIndex = fromIndex % list_length
+	toIndex = toIndex % (list_length + 1)
+	if (fromIndex <= 0)
+		fromIndex += list_length
+	if (toIndex <= 0)
+		toIndex += list_length + 1
+	var/datum/sort_instance/sorter = GLOB.sort_instance
+	if (isnull(sorter))
+		sorter = new
+	sorter.L = to_sort
+	sorter.cmp = cmp
+	sorter.associative = associative
+	try
+		sorter.binarySort(fromIndex, toIndex)
+	catch
+		return to_sort
 	return to_sort
 
 #undef CREATE_SORT_INSTANCE

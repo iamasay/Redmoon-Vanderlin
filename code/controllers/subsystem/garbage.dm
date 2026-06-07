@@ -73,8 +73,21 @@ SUBSYSTEM_DEF(garbage)
 
 /datum/controller/subsystem/garbage/stat_entry(msg)
 	var/list/counts = list()
-	for (var/list/L in queues)
-		counts += length(L)
+	if(!islist(queues))
+		InitQueues()
+	var/queue_count = 0
+	try
+		queue_count = length(queues)
+	catch
+		queues = null
+		InitQueues()
+	for(var/queue_index in 1 to queue_count)
+		var/list/L
+		try
+			L = queues[queue_index]
+			counts += length(L)
+		catch
+			counts += 0
 	msg += "Q:[counts.Join(",")]|D:[delslasttick]|G:[gcedlasttick]|"
 	msg += "GR:"
 	if (!(delslasttick+gcedlasttick))
@@ -143,7 +156,7 @@ SUBSYSTEM_DEF(garbage)
 				break
 
 /datum/controller/subsystem/garbage/proc/InitQueues()
-	if (isnull(queues)) // Only init the queues if they don't already exist, prevents overriding of recovered lists
+	if (isnull(queues) || !islist(queues)) // Only init the queues if they don't already exist, prevents overriding of recovered lists
 		queues = new(GC_QUEUE_COUNT)
 		pass_counts = new(GC_QUEUE_COUNT)
 		fail_counts = new(GC_QUEUE_COUNT)
@@ -156,15 +169,41 @@ SUBSYSTEM_DEF(garbage)
 	if (level == GC_QUEUE_FILTER)
 		delslasttick = 0
 		gcedlasttick = 0
-	var/cut_off_time = world.time - collection_timeout[level] //ignore entries newer then this
-	var/list/queue = queues[level]
+	if(!islist(collection_timeout))
+		collection_timeout = list(GC_FILTER_QUEUE, GC_CHECK_QUEUE, GC_DEL_QUEUE)
+	if(!islist(queues) || !islist(pass_counts) || !islist(fail_counts))
+		queues = null
+		InitQueues()
+	var/timeout = GC_FILTER_QUEUE
+	try
+		timeout = collection_timeout[level]
+	catch
+		collection_timeout = list(GC_FILTER_QUEUE, GC_CHECK_QUEUE, GC_DEL_QUEUE)
+		timeout = collection_timeout[level]
+	var/cut_off_time = world.time - timeout //ignore entries newer then this
+	var/list/queue
+	try
+		queue = queues[level]
+	catch
+		queues = null
+		InitQueues()
+		queue = queues[level]
+	if(!islist(queue))
+		queues[level] = list()
+		return
 	var/static/lastlevel
 	var/static/count = 0
 	if (count) //runtime last run before we could do this.
 		var/c = count
 		count = 0 //so if we runtime on the Cut, we don't try again.
-		var/list/lastqueue = queues[lastlevel]
-		lastqueue.Cut(1, c+1)
+		var/list/lastqueue
+		try
+			lastqueue = queues[lastlevel]
+			if(islist(lastqueue))
+				lastqueue.Cut(1, c+1)
+		catch
+			if(islist(queues))
+				queues[lastlevel] = list()
 
 	lastlevel = level
 
@@ -173,27 +212,58 @@ SUBSYSTEM_DEF(garbage)
 
 	//We do this rather then for(var/list/ref_info in queue) because that sort of for loop copies the whole list.
 	//Normally this isn't expensive, but the gc queue can grow to 40k items, and that gets costly/causes overrun.
-	for(var/i in 1 to length(queue))
-		var/list/L = queue[i]
-		if(length(L) < GC_QUEUE_ITEM_INDEX_COUNT)
+	var/queue_length = 0
+	try
+		queue_length = length(queue)
+	catch
+		queues[level] = list()
+		return
+	for(var/i in 1 to queue_length)
+		var/list/L
+		try
+			L = queue[i]
+		catch
+			count++
+			continue
+		var/queue_item_length = 0
+		try
+			queue_item_length = length(L)
+		catch
+			count++
+			if (MC_TICK_CHECK)
+				break
+			continue
+		if(queue_item_length < GC_QUEUE_ITEM_INDEX_COUNT)
 			count++
 			if (MC_TICK_CHECK)
 				break
 			continue
 
-		var/queued_at_time = L[GC_QUEUE_ITEM_QUEUE_TIME]
+		var/queued_at_time
+		try
+			queued_at_time = L[GC_QUEUE_ITEM_QUEUE_TIME]
+		catch
+			count++
+			continue
 		if(queued_at_time > cut_off_time)
 			break // Everything else is newer, skip them
 		count++
 
-		var/datum/D = L[GC_QUEUE_ITEM_REF]
+		var/datum/D
+		try
+			D = L[GC_QUEUE_ITEM_REF]
+		catch
+			continue
 
 		// 1 from the hard reference in the queue, and 1 from the variable used before this
 		// If that's all we've got, send er off
 		if(refcount(D) == REFS_WE_EXPECT)
 			++gcedlasttick
 			++totalgcs
-			pass_counts[level]++
+			try
+				pass_counts[level]++
+			catch
+				pass_counts = new(GC_QUEUE_COUNT)
 			#ifdef REFERENCE_TRACKING
 			reference_find_on_fail -= text_ref(D)	//It's deleted we don't care anymore.
 			#endif
@@ -206,7 +276,10 @@ SUBSYSTEM_DEF(garbage)
 		#endif
 
 		// Something's still referring to the qdel'd object.
-		fail_counts[level]++
+		try
+			fail_counts[level]++
+		catch
+			fail_counts = new(GC_QUEUE_COUNT)
 		switch(level)
 			if(GC_QUEUE_CHECK)
 				#ifdef REFERENCE_TRACKING
@@ -224,7 +297,16 @@ SUBSYSTEM_DEF(garbage)
 				reference_find_on_fail -= text_ref(D)
 				#endif
 				var/type = D.type
-				var/datum/qdel_item/I = items[type]
+				var/datum/qdel_item/I
+				try
+					if(!islist(items))
+						items = list()
+					I = items[type]
+					if(isnull(I))
+						I = items[type] = new /datum/qdel_item(type)
+				catch
+					items = list()
+					I = items[type] = new /datum/qdel_item(type)
 
 				var/message = "## TESTING: GC: -- [text_ref(D)] | [type] was unable to be GC'd --"
 				message = "[message] (ref count of [refcount(D)])"
@@ -265,7 +347,11 @@ SUBSYSTEM_DEF(garbage)
 		if(MC_TICK_CHECK)
 			break
 	if(count)
-		queue.Cut(1,count+1)
+		try
+			queue.Cut(1,count+1)
+		catch
+			if(islist(queues))
+				queues[level] = list()
 		count = 0
 
 #undef REFS_WE_EXPECT
@@ -282,22 +368,52 @@ SUBSYSTEM_DEF(garbage)
 	if (D.gc_destroyed <= 0)
 		D.gc_destroyed = queue_time
 
-	var/list/queue = queues[level]
+	if(!islist(queues))
+		queues = null
+		InitQueues()
+	var/list/queue
+	try
+		queue = queues[level]
+	catch
+		queues = null
+		InitQueues()
+		queue = queues[level]
+	if(!islist(queue))
+		queue = list()
+		queues[level] = queue
 
-	queue[++queue.len] = list(queue_time, D, D.gc_destroyed) // not += for byond reasons
+	try
+		queue[++queue.len] = list(queue_time, D, D.gc_destroyed) // not += for byond reasons
+	catch
+		queues[level] = list(list(queue_time, D, D.gc_destroyed))
 
 //this is mainly to separate things profile wise.
 /datum/controller/subsystem/garbage/proc/HardDelete(datum/D, override = FALSE)
 	if(!D)
 		return
 	if(!enable_hard_deletes && !override)
-		failed_hard_deletes |= D
+		try
+			if(!islist(failed_hard_deletes))
+				failed_hard_deletes = list()
+			if(!(D in failed_hard_deletes))
+				failed_hard_deletes += D
+		catch
+			failed_hard_deletes = list(D)
 		return
 	++delslasttick
 	++totaldels
 	var/type = D.type
 	var/refID = text_ref(D)
-	var/datum/qdel_item/type_info = items[type]
+	var/datum/qdel_item/type_info
+	try
+		if(!islist(items))
+			items = list()
+		type_info = items[type]
+		if(isnull(type_info))
+			type_info = items[type] = new /datum/qdel_item(type)
+	catch
+		items = list()
+		type_info = items[type] = new /datum/qdel_item(type)
 	var/detail = D.dump_harddel_info()
 	if(detail)
 		LAZYADD(type_info.extra_details, detail)
@@ -368,8 +484,15 @@ SUBSYSTEM_DEF(garbage)
 		del(to_delete)
 		return
 
-	var/datum/qdel_item/trash = SSgarbage.items[to_delete.type]
-	if (isnull(trash))
+	var/datum/qdel_item/trash
+	try
+		if(!islist(SSgarbage.items))
+			SSgarbage.items = list()
+		trash = SSgarbage.items[to_delete.type]
+		if (isnull(trash))
+			trash = SSgarbage.items[to_delete.type] = new /datum/qdel_item(to_delete.type)
+	catch
+		SSgarbage.items = list()
 		trash = SSgarbage.items[to_delete.type] = new /datum/qdel_item(to_delete.type)
 	trash.qdels++
 

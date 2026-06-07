@@ -24,44 +24,95 @@ SUBSYSTEM_DEF(job)
 	var/list/experience_jobs_map = list()
 
 /datum/controller/subsystem/job/Initialize(timeofday)
-	if(!length(all_occupations))
+	var/occupation_count = 0
+	try
+		occupation_count = length(all_occupations)
+	catch
+		all_occupations = list()
+	if(!occupation_count)
 		SetupOccupations()
 	return ..()
 
 /datum/controller/subsystem/job/proc/SetupOccupations()
 	all_occupations = list()
 	joinable_occupations = list()
+	name_occupations = list()
+	type_occupations = list()
+	experience_jobs_map = list()
 	var/list/all_jobs = subtypesof(/datum/job)
 	if(!length(all_jobs))
 		to_chat(world, span_boldannounce("Error setting up jobs, no job datums found."))
 		to_chat(world, span_boldannounce("You should start panicking."))
 		return FALSE
 
-	for(var/job_type in all_jobs)
-		var/datum/job/job = new job_type()
-		all_occupations += job
-		name_occupations[job.title] = job
-		type_occupations[job_type] = job
-		if(job.job_flags & JOB_NEW_PLAYER_JOINABLE)
-			joinable_occupations += job
+	var/all_job_count = 0
+	try
+		all_job_count = length(all_jobs)
+	catch
+		all_job_count = 0
+	for(var/job_index in 1 to all_job_count)
+		var/job_type
+		var/datum/job/job
+		try
+			job_type = all_jobs[job_index]
+			job = new job_type()
+			all_occupations += job
+			name_occupations[job.title] = job
+			type_occupations[job_type] = job
+			if(job.job_flags & JOB_NEW_PLAYER_JOINABLE)
+				joinable_occupations += job
+		catch
+			continue
 
-		for(var/t in job.exp_types_granted)
-			if(!(t in experience_jobs_map))
-				experience_jobs_map[t] = list()
-			experience_jobs_map[t] += job
+		var/exp_type_count = 0
+		try
+			exp_type_count = length(job.exp_types_granted)
+		catch
+			exp_type_count = 0
+		for(var/exp_type_index in 1 to exp_type_count)
+			try
+				var/t = job.exp_types_granted[exp_type_index]
+				if(!(t in experience_jobs_map))
+					experience_jobs_map[t] = list()
+				experience_jobs_map[t] += job
+			catch
+				continue
 	if(SSmapping.map_adjustment)
-		SSmapping.map_adjustment.job_change()
+		try
+			SSmapping.map_adjustment.job_change()
+		catch
+			log_world("Map adjustment job_change failed; continuing with unadjusted jobs.")
 	return TRUE
 
 /datum/controller/subsystem/job/proc/GetJob(rank)
-	if(!length(all_occupations))
+	var/occupation_count = 0
+	try
+		occupation_count = length(all_occupations)
+	catch
+		all_occupations = list()
+	if(!occupation_count)
 		SetupOccupations()
-	return name_occupations[rank]
+	try
+		return name_occupations[rank]
+	catch
+		name_occupations = list()
+		SetupOccupations()
+		return name_occupations[rank]
 
 /datum/controller/subsystem/job/proc/GetJobType(jobtype)
-	if(!length(all_occupations))
+	var/occupation_count = 0
+	try
+		occupation_count = length(all_occupations)
+	catch
+		all_occupations = list()
+	if(!occupation_count)
 		SetupOccupations()
-	return type_occupations[jobtype]
+	try
+		return type_occupations[jobtype]
+	catch
+		type_occupations = list()
+		SetupOccupations()
+		return type_occupations[jobtype]
 
 /datum/controller/subsystem/job/proc/AssignRole(mob/dead/new_player/player, datum/job/job, latejoin = FALSE)
 	JobDebug("Running AR, Player: [player], Rank: [job?.type || "null"], LJ: [latejoin]")
@@ -495,16 +546,37 @@ SUBSYSTEM_DEF(job)
 	return boosts
 
 /datum/controller/subsystem/job/proc/save_player_boosts(ckey)
-	var/datum/save_manager/SM = get_save_manager(ckey)
+	var/datum/save_manager/SM
+	try
+		SM = get_save_manager(ckey)
+	catch
+		return FALSE
 	if(!SM)
 		return FALSE
 
-	var/client/C = GLOB.directory[ckey]
+	var/client/C
+	try
+		C = GLOB.directory[ckey]
+	catch
+		return FALSE
 	if(!C || !islist(C.job_priority_boosts))
 		return FALSE
 
 	var/list/boost_data = list()
-	for(var/datum/job_priority_boost/boost in C.job_priority_boosts)
+	var/boost_count = 0
+	try
+		boost_count = length(C.job_priority_boosts)
+	catch
+		C.job_priority_boosts = list()
+		return FALSE
+	for(var/boost_index in 1 to boost_count)
+		var/datum/job_priority_boost/boost
+		try
+			boost = C.job_priority_boosts[boost_index]
+		catch
+			continue
+		if(!boost)
+			continue
 		if(!boost.is_valid())
 			continue
 

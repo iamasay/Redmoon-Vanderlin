@@ -122,14 +122,39 @@
 	return null
 
 /datum/save_manager/proc/list_save_files()
-	return save_files.Copy()
+	if(!islist(save_files))
+		save_files = list()
+	try
+		return save_files.Copy()
+	catch
+		save_files = list()
+		return list()
 
 /datum/save_manager/proc/force_save_all()
 	var/success = TRUE
-	for(var/save_name in save_files)
-		var/datum/save_file/SF = save_files[save_name]
-		if(SF && !SF.save_to_file())
+	if(!islist(save_files))
+		save_files = list()
+	var/save_count = 0
+	try
+		save_count = length(save_files)
+	catch
+		save_files = list()
+		return FALSE
+	for(var/save_index in 1 to save_count)
+		var/save_name
+		var/datum/save_file/SF
+		try
+			save_name = save_files[save_index]
+			SF = save_files[save_name]
+		catch
 			success = FALSE
+			continue
+		if(SF)
+			try
+				if(!SF.save_to_file())
+					success = FALSE
+			catch
+				success = FALSE
 	return success
 
 /datum/save_manager/proc/start_auto_save()
@@ -370,12 +395,21 @@ GLOBAL_LIST_EMPTY(player_save_managers)
 
 	ckey = ckey(ckey)
 
-	if(ckey in GLOB.player_save_managers)
-		return GLOB.player_save_managers[ckey]
+	if(!islist(GLOB.player_save_managers))
+		GLOB.player_save_managers = list()
+	try
+		if(ckey in GLOB.player_save_managers)
+			return GLOB.player_save_managers[ckey]
+	catch
+		GLOB.player_save_managers = list()
 
 	var/datum/save_manager/SM = new /datum/save_manager(ckey)
 	if(SM)
-		GLOB.player_save_managers[ckey] = SM
+		try
+			GLOB.player_save_managers[ckey] = SM
+		catch
+			GLOB.player_save_managers = list()
+			GLOB.player_save_managers[ckey] = SM
 		return SM
 
 	return null
