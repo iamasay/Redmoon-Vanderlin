@@ -485,16 +485,15 @@ GLOBAL_LIST_INIT(name_adjustments, list())
 		.voice-bark {
 			top: 166px;
 			left: 10px;
-			width: 92px;
-			height: 10px;
+			width: 46px;
+			height: 9px;
 			background-image: url('voice_bark.png');
-			z-index: 2;
 		}
 		.voice-bark:hover { background-image: url('voice_bark_hover.png'); }
 		.voice-bark .bark-label {
 			padding-left: 12px;
-			width: 80px;
-			height: 10px;
+			width: 32px;
+			height: 9px;
 			font-size: 7px;
 			letter-spacing: 0.2px;
 		}
